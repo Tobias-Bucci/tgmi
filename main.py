@@ -7,6 +7,9 @@ from __future__ import annotations
 
 import copy
 import json
+import os
+import shutil
+import subprocess
 import sys
 import time
 from dataclasses import dataclass, asdict
@@ -16,10 +19,11 @@ from typing import Any, Dict, List, Optional
 
 import requests
 from rich import box
+from rich.align import Align
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
-from rich.prompt import Confirm
+from rich.prompt import Confirm, Prompt
 from rich.table import Table
 from rich.live import Live
 from rich.spinner import Spinner
@@ -99,6 +103,11 @@ LANG = {
     "thinking_disabled": "Denkmode deaktiviert.",
     "thinking_unavailable": "Für dieses Modell ist der Denkmode nicht verfügbar.",
     "thinking_in_progress": "Denkmode aktiv – Gemini denkt…",
+    "copy_panel_title": "Antwort kopieren",
+    "copy_instruction": "[c] Kopieren  ·  [Enter] überspringen",
+    "copy_prompt": "Aktion wählen (c/Enter): ",
+    "copy_success": "Antwort wurde in die Zwischenablage kopiert.",
+    "copy_failure": "Antwort konnte nicht kopiert werden.",
         "history_saved": "Chat-Historie gespeichert.",
         "history_loaded": "Chat-Historie geladen.",
         "history_cleared": "Chat-Historie geleert.",
@@ -164,6 +173,11 @@ LANG = {
     "thinking_disabled": "Thinking mode disabled.",
     "thinking_unavailable": "This model does not support the extended thinking mode.",
     "thinking_in_progress": "Thinking mode active – Gemini is reasoning…",
+    "copy_panel_title": "Copy response",
+    "copy_instruction": "[c] Copy  ·  [Enter] skip",
+    "copy_prompt": "Choose action (c/Enter): ",
+    "copy_success": "Response copied to clipboard.",
+    "copy_failure": "Could not copy the response to the clipboard.",
         "history_saved": "Chat history saved.",
         "history_loaded": "Chat history reloaded.",
         "history_cleared": "Chat history cleared.",
@@ -188,6 +202,54 @@ LANG = {
         "status_saved_at": "History saved at {time}.",
     },
 }
+
+
+class ClipboardHelper:
+    """Hilfsfunktionen zum Kopieren von Text in die Zwischenablage."""
+
+    @staticmethod
+    def copy_text(text: str) -> bool:
+        if not text:
+            return False
+
+        try:
+            import pyperclip  # type: ignore
+        except ImportError:
+            pyperclip = None  # type: ignore
+
+        if pyperclip is not None:
+            try:
+                pyperclip.copy(text)
+                return True
+            except Exception:
+                pass
+
+        platform = sys.platform
+        commands: List[List[str]] = []
+
+        if os.name == "nt":
+            commands.append(["clip"])
+        elif platform == "darwin":
+            commands.append(["pbcopy"])
+        else:
+            commands.extend(
+                [
+                    ["wl-copy"],
+                    ["xclip", "-selection", "clipboard"],
+                    ["xsel", "--clipboard", "--input"],
+                ]
+            )
+
+        for command in commands:
+            if shutil.which(command[0]) is None:
+                continue
+            try:
+                subprocess.run(command, input=text, text=True, check=True)
+                return True
+            except Exception:
+                continue
+
+        return False
 
 
 @dataclass
@@ -825,6 +887,27 @@ class TerminalApp:
             rendered = response
         panel = Panel(rendered, title=f"{self.lang['model_label']} ({self.settings_manager.settings.model})", border_style="magenta", box=box.ROUNDED)
         self.console.print(panel)
+        self._offer_copy_option(response)
+
+    def _offer_copy_option(self, response: str) -> None:
+        instruction = Align.center(self.lang["copy_instruction"], vertical="middle")
+        panel = Panel(instruction, title=self.lang["copy_panel_title"], border_style="cyan", box=box.ROUNDED)
+        self.console.print(panel)
+        skip_token = "skip"
+        choice = Prompt.ask(
+            f"[bold]{self.lang['copy_prompt']}[/bold]",
+            choices=["c", skip_token],
+            default=skip_token,
+            show_choices=False,
+        )
+        if choice.lower() != "c":
+            return
+        text_to_copy = response
+        success = ClipboardHelper.copy_text(text_to_copy)
+        if success:
+            self.console.print(Panel.fit(self.lang["copy_success"], style="green"))
+        else:
+            self.console.print(Panel.fit(self.lang["copy_failure"], style="yellow"))
 
 
 def main() -> None:
