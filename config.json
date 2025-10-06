@@ -1,0 +1,8 @@
+{
+  "api_key": "AIzaSyAuu8RN779mRyz5p_k7bUMRvJmC6xuPQDA",
+  "model": "gemini-2.5-pro",
+  "language": "en",
+  "output_format": "markdown",
+  "history_path": "history.json",
+  "extended_thinking": true
+}
