@@ -64,7 +64,7 @@ Unterstützte Modellkandidaten:
 - `gemini-live-2.5-flash-preview-native-audio`
 - (Legacy) `gemini-1.5-flash`, `gemini-1.5-pro`
 
-Der Denkmode lässt sich für die Modelle `gemini-2.5-*` sowie `gemini-2.0-*` aktivieren; das Programm ergänzt dann intern eine ausführliche Systemanweisung und passt die Sampling-Parameter für bessere Reasoning-Antworten an.
+Der Denkmode lässt sich für die Modelle `gemini-2.5-*` sowie `gemini-2.0-*` aktivieren; das Programm ergänzt dann intern eine ausführliche Systemanweisung und passt die Sampling-Parameter für bessere Reasoning-Antworten an. Während das Modell denkt, zeigt der Client einen temporären Hinweis an, der nach Abschluss automatisch verschwindet.
 
 ### Historie
 

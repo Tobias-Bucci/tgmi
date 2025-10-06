@@ -4,7 +4,7 @@
   "language": "en",
   "output_format": "markdown",
   "history_path": "history.json",
-  "extended_thinking": true,
+  "extended_thinking": false,
   "max_output_tokens": null,
   "request_timeout": 300
 }

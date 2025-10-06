@@ -48,5 +48,35 @@
     "role": "assistant",
     "content": "```python\nname = input(\"Bitte geben Sie Ihren Namen ein: \")\nage = int(input(\"Bitte geben Sie Ihr Alter ein: \"))\n\nif age >= 18:\n    message = f\"Hallo {name}! Sie sind volljährig.\"\nelse:\n    message = f\"Hallo {name}! Sie sind noch nicht volljährig.\"\n\nprint(message)\n```",
     "timestamp": "2025-10-06T13:50:44.758217"
+  },
+  {
+    "role": "user",
+    "content": "He",
+    "timestamp": "2025-10-06T13:57:07.113788"
+  },
+  {
+    "role": "assistant",
+    "content": "Hallo! Wie kann ich Ihnen helfen?",
+    "timestamp": "2025-10-06T13:57:07.113808"
+  },
+  {
+    "role": "user",
+    "content": "Wie gehts",
+    "timestamp": "2025-10-06T13:57:15.078901"
+  },
+  {
+    "role": "assistant",
+    "content": "Als KI habe ich keine Gefühle oder Befindlichkeiten, daher geht es mir nicht \"gut\" oder \"schlecht\" im menschlichen Sinne. Ich bin immer bereit und funktionsfähig, um Ihre Fragen zu beantworten und Ihnen zu helfen.\n\nWie geht es Ihnen?",
+    "timestamp": "2025-10-06T13:57:15.078907"
+  },
+  {
+    "role": "user",
+    "content": "Hey",
+    "timestamp": "2025-10-06T13:57:36.262124"
+  },
+  {
+    "role": "assistant",
+    "content": "Hallo! Wie kann ich Ihnen helfen?",
+    "timestamp": "2025-10-06T13:57:36.262131"
   }
 ]

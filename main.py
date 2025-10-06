@@ -21,6 +21,8 @@ from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.prompt import Confirm
 from rich.table import Table
+from rich.live import Live
+from rich.spinner import Spinner
 
 # Konstante Konfigurationspfade
 CONFIG_PATH = Path("config.json")
@@ -96,6 +98,7 @@ LANG = {
     "thinking_enabled": "Denkmode aktiviert – das Modell nutzt längere Überlegungen.",
     "thinking_disabled": "Denkmode deaktiviert.",
     "thinking_unavailable": "Für dieses Modell ist der Denkmode nicht verfügbar.",
+    "thinking_in_progress": "Denkmode aktiv – Gemini denkt…",
         "history_saved": "Chat-Historie gespeichert.",
         "history_loaded": "Chat-Historie geladen.",
         "history_cleared": "Chat-Historie geleert.",
@@ -160,6 +163,7 @@ LANG = {
     "thinking_enabled": "Thinking mode enabled – the model will take extra reasoning time.",
     "thinking_disabled": "Thinking mode disabled.",
     "thinking_unavailable": "This model does not support the extended thinking mode.",
+    "thinking_in_progress": "Thinking mode active – Gemini is reasoning…",
         "history_saved": "Chat history saved.",
         "history_loaded": "Chat history reloaded.",
         "history_cleared": "Chat history cleared.",
@@ -790,17 +794,20 @@ class TerminalApp:
             self.console.print(Panel.fit(self.lang["missing_key"], style="red"))
             return
 
-        self.console.print(Panel.fit(self.lang["sending"], style="blue"))
         thinking_enabled = self.is_thinking_enabled()
         generation_config = self._build_generation_config(thinking_enabled)
+        status_message = self.lang["thinking_in_progress"] if thinking_enabled else self.lang["sending"]
+        spinner = Spinner("dots", text=status_message)
+        status_panel = Panel(spinner, border_style="blue", box=box.ROUNDED)
         try:
-            # Der komplette Verlauf wird an Gemini übergeben, um Kontext zu erhalten
-            response = self.client.send_message(
-                self.history_manager.build_gemini_payload(),
-                message,
-                system_instruction=THINKING_SYSTEM_PROMPT if thinking_enabled else None,
-                generation_config=generation_config,
-            )
+            with Live(status_panel, refresh_per_second=12, console=self.console, transient=True):
+                # Der komplette Verlauf wird an Gemini übergeben, um Kontext zu erhalten
+                response = self.client.send_message(
+                    self.history_manager.build_gemini_payload(),
+                    message,
+                    system_instruction=THINKING_SYSTEM_PROMPT if thinking_enabled else None,
+                    generation_config=generation_config,
+                )
         except RuntimeError as exc:
             self.console.print(Panel.fit(self.lang["http_error"].format(detail=str(exc)), title=self.lang["error"], style="red"))
             return
