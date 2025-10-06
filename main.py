@@ -5,6 +5,7 @@ bereit. Es nutzt Rich für eine farbige Terminalausgabe und Requests für HTTP-C
 """
 from __future__ import annotations
 
+import copy
 import json
 import sys
 import time
@@ -27,6 +28,7 @@ DEFAULT_HISTORY_PATH = Path("history.json")
 DEFAULT_MODEL = "gemini-2.5-flash"
 # Vom Nutzer bereitgestellter API-Key
 DEFAULT_API_KEY = "AIzaSyAuu8RN779mRyz5p_k7bUMRvJmC6xuPQDA"
+DEFAULT_REQUEST_TIMEOUT = 120
 SUGGESTED_MODELS = [
     "gemini-2.5-pro",
     "gemini-2.5-flash",
@@ -35,8 +37,6 @@ SUGGESTED_MODELS = [
     "gemini-2.0-flash-lite",
     "gemini-live-2.5-flash",
     "gemini-live-2.5-flash-preview-native-audio",
-    "gemini-1.5-flash",
-    "gemini-1.5-pro",
 ]
 THINKING_MODELS = {
     "gemini-2.5-pro",
@@ -48,10 +48,9 @@ THINKING_SYSTEM_PROMPT = (
     "analyse the task step by step, consider alternative perspectives, and only then craft a concise "
     "final answer for the user. Use structured reasoning internally and return only the final response."
 )
-THINKING_GENERATION_CONFIG = {
+THINKING_GENERATION_CONFIG_BASE = {
     "temperature": 0.6,
     "topP": 0.95,
-    "maxOutputTokens": 2048,
 }
 
 # Sprachpakete für das Interface
@@ -61,18 +60,35 @@ LANG = {
         "prompt": "[bold cyan]Du:[/bold cyan] ",
         "model_label": "Gemini",
         "options_title": "Optionen",
-    "options_menu": "1) API-Schlüssel ändern\n2) Sprache ändern\n3) Ausgabeformat ändern\n4) Modell ändern\n5) Denkmode umschalten\n6) Zurück",
-    "enter_choice": "Wähle eine Option (1-6): ",
+    "options_menu": (
+            "1) API-Schlüssel ändern\n"
+            "2) Sprache ändern\n"
+            "3) Ausgabeformat ändern\n"
+            "4) Modell ändern\n"
+            "5) Denkmode umschalten\n"
+            "6) Token-Limit einstellen\n"
+            "7) Timeout einstellen\n"
+            "8) Zurück"
+        ),
+    "enter_choice": "Wähle eine Option (1-8): ",
         "new_api_key": "Neuen API-Schlüssel eingeben: ",
         "api_updated": "API-Schlüssel wurde aktualisiert.",
         "language_updated": "Sprache wurde geändert.",
         "format_updated": "Ausgabeformat wurde geändert.",
         "current_language": "Aktuelle Sprache: {lang}",
         "current_format": "Ausgabeformat: {fmt}",
+    "current_max_tokens": "Maximale Antwort-Tokens: {value}",
+    "current_timeout": "HTTP-Timeout: {seconds} s",
     "current_model": "Aktuelles Modell: {model}",
     "available_models": "Verfügbare Modelle (Beispiele): {models}",
     "model_prompt": "Modellname eingeben: ",
     "model_updated": "Modell wurde geändert.",
+    "max_tokens_prompt": "Maximale Antwort-Tokens eingeben (leer für unbegrenzt): ",
+    "max_tokens_updated": "Token-Limit wurde aktualisiert.",
+    "max_tokens_cleared": "Token-Limit wurde entfernt.",
+    "max_tokens_unlimited": "unbegrenzt",
+    "timeout_prompt": "Timeout in Sekunden eingeben: ",
+    "timeout_updated": "Timeout wurde aktualisiert.",
     "current_thinking": "Denkmode: {state}",
     "thinking_state_on": "aktiv",
     "thinking_state_off": "deaktiviert",
@@ -108,18 +124,35 @@ LANG = {
         "prompt": "[bold cyan]You:[/bold cyan] ",
         "model_label": "Gemini",
         "options_title": "Settings",
-    "options_menu": "1) Change API key\n2) Switch language\n3) Change output format\n4) Change model\n5) Toggle thinking mode\n6) Back",
-    "enter_choice": "Choose an option (1-6): ",
+    "options_menu": (
+            "1) Change API key\n"
+            "2) Switch language\n"
+            "3) Change output format\n"
+            "4) Change model\n"
+            "5) Toggle thinking mode\n"
+            "6) Set token limit\n"
+            "7) Set timeout\n"
+            "8) Back"
+        ),
+    "enter_choice": "Choose an option (1-8): ",
         "new_api_key": "Enter new API key: ",
         "api_updated": "API key updated.",
         "language_updated": "Language switched.",
         "format_updated": "Output format updated.",
         "current_language": "Current language: {lang}",
         "current_format": "Output format: {fmt}",
+    "current_max_tokens": "Max output tokens: {value}",
+    "current_timeout": "HTTP timeout: {seconds} s",
     "current_model": "Current model: {model}",
     "available_models": "Sample models: {models}",
     "model_prompt": "Enter model identifier: ",
     "model_updated": "Model updated.",
+    "max_tokens_prompt": "Enter maximum output tokens (leave empty for unlimited): ",
+    "max_tokens_updated": "Token limit updated.",
+    "max_tokens_cleared": "Token limit removed.",
+    "max_tokens_unlimited": "unlimited",
+    "timeout_prompt": "Enter timeout in seconds: ",
+    "timeout_updated": "Timeout updated.",
     "current_thinking": "Thinking mode: {state}",
     "thinking_state_on": "enabled",
     "thinking_state_off": "disabled",
@@ -163,6 +196,8 @@ class Settings:
     output_format: str = "markdown"
     history_path: str = str(DEFAULT_HISTORY_PATH)
     extended_thinking: bool = False
+    max_output_tokens: Optional[int] = None
+    request_timeout: int = DEFAULT_REQUEST_TIMEOUT
 
 
 class SettingsManager:
@@ -265,10 +300,19 @@ class GeminiClient:
         "https://generativelanguage.googleapis.com/v1beta",
     )
 
-    def __init__(self, api_key: str, model: str = DEFAULT_MODEL) -> None:
+    def __init__(
+        self,
+        api_key: str,
+        model: str = DEFAULT_MODEL,
+        *,
+        timeout: int = DEFAULT_REQUEST_TIMEOUT,
+    max_output_tokens_retry: Optional[int] = None,
+    ) -> None:
         self.api_key = api_key
         self.model = model
         self.api_base = self.API_BASES[0]
+        self.timeout = timeout
+        self.max_output_tokens_retry = max_output_tokens_retry
 
     def send_message(
         self,
@@ -277,27 +321,42 @@ class GeminiClient:
         *,
         system_instruction: Optional[str] = None,
         generation_config: Optional[Dict[str, Any]] = None,
+        allow_max_tokens_retry: bool = True,
     ) -> str:
         """Sendet eine Nachricht an Gemini und gibt den Antworttext zurück."""
 
         headers = {"Content-Type": "application/json"}
         contents = [*history]
-        if system_instruction:
-            contents.insert(0, {"role": "system", "parts": [{"text": system_instruction}]})
         contents.append({"role": "user", "parts": [{"text": message}]})
 
         payload: Dict[str, Any] = {"contents": contents}
+        if system_instruction:
+            payload["system_instruction"] = {
+                "role": "system",
+                "parts": [{"text": system_instruction}],
+            }
         if generation_config:
-            payload["generationConfig"] = generation_config
+            payload["generationConfig"] = copy.deepcopy(generation_config)
 
         bases_to_try = [self.api_base] + [base for base in self.API_BASES if base != self.api_base]
+        if system_instruction:
+            beta_base = self.API_BASES[-1]
+            if beta_base in bases_to_try:
+                bases_to_try.remove(beta_base)
+            bases_to_try.insert(0, beta_base)
         not_found_messages: List[str] = []
 
         for base in bases_to_try:
             url = f"{base}/models/{self.model}:generateContent"
             try:
                 # HTTP-Anfrage mit Timeout absenden
-                response = requests.post(url, headers=headers, params={"key": self.api_key}, json=payload, timeout=30)
+                response = requests.post(
+                    url,
+                    headers=headers,
+                    params={"key": self.api_key},
+                    json=payload,
+                    timeout=self.timeout,
+                )
                 response.raise_for_status()
             except requests.HTTPError as http_err:
                 detail = self._extract_error(http_err.response) or str(http_err)
@@ -305,21 +364,111 @@ class GeminiClient:
                 if status_code == 404:
                     not_found_messages.append(detail)
                     continue
+                if (
+                    status_code == 400
+                    and system_instruction is not None
+                    and (
+                        "systemInstruction" in (detail or "")
+                        or "system_instruction" in (detail or "")
+                    )
+                    and base != self.API_BASES[-1]
+                ):
+                    # Fallback auf beta-Endpunkt, das Systeminstruktionen unterstützt
+                    continue
                 raise RuntimeError(detail) from http_err
             except requests.RequestException as exc:  # Netzwerk- oder sonstige Fehler
                 raise RuntimeError(str(exc)) from exc
 
             data = response.json()
+            prompt_feedback = data.get("promptFeedback")
+            if isinstance(prompt_feedback, dict):
+                block_reason = prompt_feedback.get("blockReason")
+                if block_reason:
+                    safety_info = self._format_safety_details(prompt_feedback.get("safetyRatings"))
+                    message = f"Prompt blocked by safety filters ({block_reason})."
+                    if safety_info:
+                        message += f" Details: {safety_info}"
+                    raise RuntimeError(message)
             candidates = data.get("candidates", [])
             if not candidates:
                 raise RuntimeError("No candidates returned")
 
             candidate = candidates[0]
+            finish_reason = candidate.get("finishReason")
+            if finish_reason == "SAFETY":
+                safety_info = self._format_safety_details(candidate.get("safetyRatings"))
+                message = "Response blocked by safety filters."
+                if safety_info:
+                    message += f" Details: {safety_info}"
+                raise RuntimeError(message)
             content = candidate.get("content", {})
             parts = content.get("parts", [])
-            texts = [part.get("text", "") for part in parts if isinstance(part, dict)]
+            texts: List[str] = []
+            for part in parts:
+                if not isinstance(part, dict):
+                    continue
+                if part.get("text"):
+                    texts.append(part["text"])
+                elif "functionCall" in part:
+                    func = part["functionCall"] or {}
+                    name = func.get("name", "function")
+                    raw_args = func.get("args") or func.get("arguments")
+                    if isinstance(raw_args, (dict, list)):
+                        args_text = json.dumps(raw_args, ensure_ascii=False, indent=2)
+                    else:
+                        args_text = str(raw_args) if raw_args is not None else "{}"
+                    texts.append(f"[Function call requested: {name}]\n{args_text}")
+                elif "inlineData" in part:
+                    data_info = part["inlineData"] or {}
+                    mime = data_info.get("mimeType", "application/octet-stream")
+                    size = len(data_info.get("data", ""))
+                    texts.append(f"[Inline data payload received: {mime}, {size} base64 chars]")
             reply = "\n\n".join(filter(None, texts))
             if not reply:
+                if (
+                    finish_reason == "MAX_TOKENS"
+                    and allow_max_tokens_retry
+                ):
+                    upgraded_config: Dict[str, Any]
+                    retry_limit = self.max_output_tokens_retry
+                    if isinstance(retry_limit, int) and retry_limit > 0:
+                        if generation_config is None:
+                            upgraded_config = {"maxOutputTokens": retry_limit}
+                        else:
+                            upgraded_config = copy.deepcopy(generation_config)
+                            current_max = upgraded_config.get("maxOutputTokens")
+                            if not isinstance(current_max, int) or current_max < retry_limit:
+                                upgraded_config["maxOutputTokens"] = retry_limit
+                            else:
+                                upgraded_config = {}
+                    else:
+                        upgraded_config = {}
+                    if upgraded_config:
+                        return self.send_message(
+                            history,
+                            message,
+                            system_instruction=system_instruction,
+                            generation_config=upgraded_config,
+                            allow_max_tokens_retry=False,
+                        )
+                if finish_reason == "MAX_TOKENS":
+                    suggestions = [
+                        "• Shorten the latest request or remove repeated context",
+                        "• Clear old chat history via :c to free up tokens",
+                        "• Increase the token limit via the settings menu (:o) or config.json",
+                    ]
+                    hint = "\n".join(suggestions)
+                    return (
+                        "⚠️ Gemini stopped because it hit the maximum output token limit before returning any text.\n"
+                        f"Try one of these adjustments:\n{hint}"
+                    )
+                safety_info = self._format_safety_details(candidate.get("safetyRatings"))
+                if safety_info:
+                    raise RuntimeError(f"Model produced no text. Safety ratings: {safety_info}")
+                if finish_reason and finish_reason != "STOP":
+                    raise RuntimeError(
+                        f"Model finished with reason '{finish_reason}' but returned no textual content."
+                    )
                 raise RuntimeError("Empty response returned")
 
             # Erfolgreiches Base-Endpoint für künftige Aufrufe merken
@@ -360,6 +509,27 @@ class GeminiClient:
     def update_model(self, model: str) -> None:
         self.model = model
 
+    def update_timeout(self, timeout: int) -> None:
+        self.timeout = timeout
+
+    def update_max_output_tokens_retry(self, value: Optional[int]) -> None:
+        self.max_output_tokens_retry = value
+
+    @staticmethod
+    def _format_safety_details(ratings: Optional[List[Dict[str, Any]]]) -> str:
+        if not ratings:
+            return ""
+        details: List[str] = []
+        for rating in ratings:
+            if not isinstance(rating, dict):
+                continue
+            category = rating.get("category") or "unknown"
+            severity = rating.get("severity") or rating.get("probability") or rating.get("probabilityScore")
+            if isinstance(severity, dict):
+                severity = severity.get("value")
+            details.append(f"{category}: {severity}")
+        return " | ".join(details)
+
 
 class TerminalApp:
     """Steuert die Nutzerinteraktion in der Konsole."""
@@ -368,9 +538,12 @@ class TerminalApp:
         self.console = Console()
         self.settings_manager = SettingsManager()
         self.history_manager = ChatHistoryManager(Path(self.settings_manager.settings.history_path))
+        settings = self.settings_manager.settings
         self.client = GeminiClient(
-            api_key=self.settings_manager.settings.api_key,
-            model=self.settings_manager.settings.model,
+            api_key=settings.api_key,
+            model=settings.model,
+            timeout=settings.request_timeout,
+            max_output_tokens_retry=self._determine_retry_limit(),
         )
         self._ensure_api_key()
         self._refresh_language()
@@ -457,6 +630,19 @@ class TerminalApp:
                 "-",
                 self.lang["current_model"].format(model=self.settings_manager.settings.model),
             )
+            max_tokens = self.settings_manager.settings.max_output_tokens
+            if isinstance(max_tokens, int) and max_tokens > 0:
+                max_tokens_label = str(max_tokens)
+            else:
+                max_tokens_label = self.lang["max_tokens_unlimited"]
+            table.add_row(
+                "-",
+                self.lang["current_max_tokens"].format(value=max_tokens_label),
+            )
+            table.add_row(
+                "-",
+                self.lang["current_timeout"].format(seconds=self.settings_manager.settings.request_timeout),
+            )
             supports_thinking = self.settings_manager.settings.model in THINKING_MODELS
             if self.settings_manager.settings.extended_thinking and not supports_thinking:
                 thinking_state = (
@@ -484,6 +670,10 @@ class TerminalApp:
             elif choice == "5":
                 self.toggle_thinking_mode()
             elif choice == "6":
+                self.change_max_tokens()
+            elif choice == "7":
+                self.change_timeout()
+            elif choice == "8":
                 break
             else:
                 self.console.print(Panel.fit(self.lang["invalid_choice"], style="yellow"))
@@ -549,6 +739,52 @@ class TerminalApp:
         else:
             self.console.print(Panel.fit(self.lang["thinking_disabled"], style="green"))
 
+    def _determine_retry_limit(self) -> Optional[int]:
+        max_tokens = self.settings_manager.settings.max_output_tokens
+        if isinstance(max_tokens, int) and max_tokens > 0:
+            return max_tokens
+        return None
+
+    def _build_generation_config(self, thinking_enabled: bool) -> Optional[Dict[str, Any]]:
+        config: Dict[str, Any] = {}
+        if thinking_enabled:
+            config.update(THINKING_GENERATION_CONFIG_BASE)
+        max_tokens = self.settings_manager.settings.max_output_tokens
+        if isinstance(max_tokens, int) and max_tokens > 0:
+            config["maxOutputTokens"] = max_tokens
+        return config or None
+
+    def change_max_tokens(self) -> None:
+        user_input = self.console.input(self.lang["max_tokens_prompt"]).strip()
+        if not user_input:
+            self.settings_manager.update(max_output_tokens=None)
+            self.client.update_max_output_tokens_retry(self._determine_retry_limit())
+            self.console.print(Panel.fit(self.lang["max_tokens_cleared"], style="green"))
+            return
+        try:
+            value = int(user_input)
+            if value <= 0:
+                raise ValueError
+        except ValueError:
+            self.console.print(Panel.fit(self.lang["invalid_choice"], style="yellow"))
+            return
+        self.settings_manager.update(max_output_tokens=value)
+        self.client.update_max_output_tokens_retry(self._determine_retry_limit())
+        self.console.print(Panel.fit(self.lang["max_tokens_updated"], style="green"))
+
+    def change_timeout(self) -> None:
+        user_input = self.console.input(self.lang["timeout_prompt"]).strip()
+        try:
+            value = int(user_input)
+            if value <= 0:
+                raise ValueError
+        except (ValueError, TypeError):
+            self.console.print(Panel.fit(self.lang["invalid_choice"], style="yellow"))
+            return
+        self.settings_manager.update(request_timeout=value)
+        self.client.update_timeout(value)
+        self.console.print(Panel.fit(self.lang["timeout_updated"], style="green"))
+
     def process_user_message(self, message: str) -> None:
         if not self.settings_manager.settings.api_key:
             self.console.print(Panel.fit(self.lang["missing_key"], style="red"))
@@ -556,13 +792,14 @@ class TerminalApp:
 
         self.console.print(Panel.fit(self.lang["sending"], style="blue"))
         thinking_enabled = self.is_thinking_enabled()
+        generation_config = self._build_generation_config(thinking_enabled)
         try:
             # Der komplette Verlauf wird an Gemini übergeben, um Kontext zu erhalten
             response = self.client.send_message(
                 self.history_manager.build_gemini_payload(),
                 message,
                 system_instruction=THINKING_SYSTEM_PROMPT if thinking_enabled else None,
-                generation_config=THINKING_GENERATION_CONFIG if thinking_enabled else None,
+                generation_config=generation_config,
             )
         except RuntimeError as exc:
             self.console.print(Panel.fit(self.lang["http_error"].format(detail=str(exc)), title=self.lang["error"], style="red"))

@@ -48,6 +48,8 @@ Im Optionsmenü können folgende Parameter angepasst werden:
 - Ausgabeformat (Klartext oder Markdown-Rendering)
 - Verwendetes Modell (z. B. `gemini-2.5-flash`, `gemini-2.5-pro`, `gemini-2.0-flash` …)
 - Denkmode (für Modelle mit erweiterten Reasoning-Fähigkeiten)
+- Maximale Antwort-Tokens (leer lassen für unbegrenzt oder bei Bedarf erhöhen)
+- HTTP-Timeout für API-Aufrufe (praktisch bei sehr langen Antworten)
 
 > **Hinweis:** Falls der Standardwert `gemini-2.5-flash` in deiner Region nicht verfügbar ist, kannst du über `:o` → „Modell ändern“ direkt auf ein anderes Modell wechseln.
 
@@ -62,7 +64,7 @@ Unterstützte Modellkandidaten:
 - `gemini-live-2.5-flash-preview-native-audio`
 - (Legacy) `gemini-1.5-flash`, `gemini-1.5-pro`
 
-Der Denkmode lässt sich für die Modelle `gemini-2.5-*` sowie `gemini-2.0-*` aktivieren; das Programm ergänzt dann intern eine ausführliche Systemanweisung und hebt das Token-Limit für längere Antworten an.
+Der Denkmode lässt sich für die Modelle `gemini-2.5-*` sowie `gemini-2.0-*` aktivieren; das Programm ergänzt dann intern eine ausführliche Systemanweisung und passt die Sampling-Parameter für bessere Reasoning-Antworten an.
 
 ### Historie
 
