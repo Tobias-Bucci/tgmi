@@ -13,7 +13,7 @@ import subprocess
 import sys
 import time
 from dataclasses import dataclass, asdict
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -108,6 +108,13 @@ LANG = {
     "copy_prompt": "Aktion wählen (c/Enter): ",
     "copy_success": "Antwort wurde in die Zwischenablage kopiert.",
     "copy_failure": "Antwort konnte nicht kopiert werden.",
+    "export_prompt": "Dateiname für Markdown-Export angeben (Enter für {path}): ",
+    "history_exported": "Markdown-Export gespeichert unter {path}.",
+    "history_export_failed": "Markdown-Export fehlgeschlagen: {error}",
+    "history_empty_export": "Keine Einträge vorhanden – nichts zu exportieren.",
+    "role_user": "Du",
+    "role_assistant": "Gemini",
+    "role_system": "System",
         "history_saved": "Chat-Historie gespeichert.",
         "history_loaded": "Chat-Historie geladen.",
         "history_cleared": "Chat-Historie geleert.",
@@ -119,7 +126,7 @@ LANG = {
         "help_text": (
             "Verfügbare Shortcuts:\n"
             ":q - Beenden\n:s - Historie speichern\n:l - Historie laden\n"
-            ":o - Optionen\n:c - Historie leeren\n:h - Hilfe"
+            ":o - Optionen\n:c - Historie leeren\n:x - Historie als Markdown exportieren\n:h - Hilfe"
         ),
         "output_plain": "Klartext",
         "output_markdown": "Markdown",
@@ -178,6 +185,13 @@ LANG = {
     "copy_prompt": "Choose action (c/Enter): ",
     "copy_success": "Response copied to clipboard.",
     "copy_failure": "Could not copy the response to the clipboard.",
+    "export_prompt": "Enter filename for Markdown export (press Enter for {path}): ",
+    "history_exported": "History exported to {path}.",
+    "history_export_failed": "Markdown export failed: {error}",
+    "history_empty_export": "No entries to export yet.",
+    "role_user": "You",
+    "role_assistant": "Gemini",
+    "role_system": "System",
         "history_saved": "Chat history saved.",
         "history_loaded": "Chat history reloaded.",
         "history_cleared": "Chat history cleared.",
@@ -189,7 +203,7 @@ LANG = {
         "help_text": (
             "Available shortcuts:\n"
             ":q - Quit\n:s - Save history\n:l - Load history\n"
-            ":o - Settings\n:c - Clear history\n:h - Help"
+            ":o - Settings\n:c - Clear history\n:x - Export history as Markdown\n:h - Help"
         ),
         "output_plain": "Plain",
         "output_markdown": "Markdown",
@@ -345,6 +359,43 @@ class ChatHistoryManager:
         # Historie als JSON sichern
         self.path.write_text(json.dumps(self.entries, indent=2, ensure_ascii=False), encoding="utf-8")
 
+    def export_markdown(
+        self,
+        path: Path,
+        *,
+        role_labels: Optional[Dict[str, str]] = None,
+        include_timestamps: bool = True,
+    ) -> None:
+        if not self.entries:
+            raise ValueError("empty")
+
+        role_labels = role_labels or {}
+        lines: List[str] = ["# Gemini Chat Transcript"]
+        generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S %Z")
+        lines.append(f"_Generated: {generated_at}_")
+        lines.append("")
+
+        for item in self.entries:
+            role = item.get("role", "assistant")
+            label = role_labels.get(role, role.capitalize())
+
+            heading = f"### {label}"
+            timestamp = item.get("timestamp")
+            if include_timestamps and isinstance(timestamp, str):
+                formatted_ts = self._format_timestamp(timestamp)
+                if formatted_ts:
+                    heading += f" ({formatted_ts})"
+
+            lines.append(heading)
+            lines.append("")
+            content = item.get("content")
+            lines.append(content if isinstance(content, str) and content else "_(no content)_")
+            lines.append("")
+
+        markdown = "\n".join(lines).rstrip() + "\n"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(markdown, encoding="utf-8")
+
     def build_gemini_payload(self) -> List[Dict[str, object]]:
         # Konvertiert die Historie in das von Gemini erwartete Format
         payload: List[Dict[str, object]] = []
@@ -356,6 +407,19 @@ class ChatHistoryManager:
                 }
             )
         return payload
+
+    @staticmethod
+    def _format_timestamp(value: str) -> Optional[str]:
+        try:
+            dt = datetime.fromisoformat(value)
+        except ValueError:
+            return value
+
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        else:
+            dt = dt.astimezone(timezone.utc)
+        return dt.strftime("%Y-%m-%d %H:%M:%S %Z")
 
 
 class GeminiClient:
@@ -670,6 +734,8 @@ class TerminalApp:
             if Confirm.ask(self.lang["confirm_clear"], default=False):
                 self.history_manager.clear()
                 self.console.print(Panel.fit(self.lang["history_cleared"], style="yellow"))
+        elif command == "x":
+            self.export_history_markdown()
         elif command == "o":
             self.open_options()
         else:
@@ -850,6 +916,44 @@ class TerminalApp:
         self.settings_manager.update(request_timeout=value)
         self.client.update_timeout(value)
         self.console.print(Panel.fit(self.lang["timeout_updated"], style="green"))
+
+    def export_history_markdown(self) -> None:
+        if not self.history_manager.entries:
+            self.console.print(Panel.fit(self.lang["history_empty_export"], style="yellow"))
+            return
+
+        default_path = Path(self.settings_manager.settings.history_path).with_suffix(".md")
+        user_input = self.console.input(self.lang["export_prompt"].format(path=default_path)).strip()
+        export_path = Path(user_input).expanduser() if user_input else default_path
+
+        try:
+            self.history_manager.export_markdown(
+                export_path,
+                role_labels=self._get_role_labels_for_export(),
+            )
+        except ValueError:
+            self.console.print(Panel.fit(self.lang["history_empty_export"], style="yellow"))
+        except Exception as exc:
+            self.console.print(
+                Panel.fit(
+                    self.lang["history_export_failed"].format(error=str(exc)),
+                    title=self.lang["error"],
+                    style="red",
+                )
+            )
+        else:
+            display_path = export_path.resolve()
+            self.console.print(
+                Panel.fit(self.lang["history_exported"].format(path=display_path), style="green")
+            )
+
+    def _get_role_labels_for_export(self) -> Dict[str, str]:
+        return {
+            "user": self.lang.get("role_user", "User"),
+            "assistant": self.lang.get("role_assistant", "Assistant"),
+            "model": self.lang.get("role_assistant", "Assistant"),
+            "system": self.lang.get("role_system", "System"),
+        }
 
     def process_user_message(self, message: str) -> None:
         if not self.settings_manager.settings.api_key:

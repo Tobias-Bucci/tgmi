@@ -30,14 +30,15 @@ python main.py
 
 ### Tastenkombinationen
 
-| Shortcut | Funktion                |
-| -------- | ----------------------- |
-| `:q`     | Programm beenden        |
-| `:h`     | Hilfe anzeigen          |
-| `:s`     | Chat-Historie speichern |
-| `:l`     | Chat-Historie laden     |
-| `:o`     | Einstellungen öffnen    |
-| `:c`     | Chat-Historie leeren    |
+| Shortcut | Funktion                          |
+| -------- | --------------------------------- |
+| `:q`     | Programm beenden                  |
+| `:h`     | Hilfe anzeigen                    |
+| `:s`     | Chat-Historie speichern           |
+| `:l`     | Chat-Historie laden               |
+| `:o`     | Einstellungen öffnen              |
+| `:c`     | Chat-Historie leeren              |
+| `:x`     | Historie als Markdown exportieren |
 
 ### Einstellungen
 
@@ -71,7 +72,7 @@ Der Denkmode lässt sich für die Modelle `gemini-2.5-*` sowie `gemini-2.0-*` ak
 
 ### Historie
 
-Die Chat-Historie wird als JSON-Datei gespeichert (Standard: `history.json`). Änderungen werden automatisch nach jeder gesendeten Nachricht sowie über das Shortcut `:s` gespeichert.
+Die Chat-Historie wird als JSON-Datei gespeichert (Standard: `history.json`). Änderungen werden automatisch nach jeder gesendeten Nachricht sowie über das Shortcut `:s` gespeichert. Über `:x` lässt sich der Gesprächsverlauf außerdem als Markdown-Datei exportieren (Standard: `history.md`).
 
 ## Paketierung
 
