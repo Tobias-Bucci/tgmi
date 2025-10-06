@@ -8,6 +8,7 @@ from __future__ import annotations
 import copy
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -25,6 +26,7 @@ from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.prompt import Confirm, Prompt
 from rich.table import Table
+from rich.text import Text
 from rich.live import Live
 from rich.spinner import Spinner
 
@@ -112,9 +114,27 @@ LANG = {
     "history_exported": "Markdown-Export gespeichert unter {path}.",
     "history_export_failed": "Markdown-Export fehlgeschlagen: {error}",
     "history_empty_export": "Keine Einträge vorhanden – nichts zu exportieren.",
+    "history_empty": "Keine Historie vorhanden.",
     "role_user": "Du",
     "role_assistant": "Gemini",
     "role_system": "System",
+    "search_prompt": "Suchbegriff eingeben (Enter zum Abbrechen): ",
+    "search_no_results": "Keine Treffer gefunden.",
+    "search_results_title": "Suchergebnisse",
+    "search_result_column_index": "#",
+    "search_result_column_role": "Rolle",
+    "search_result_column_time": "Zeit",
+    "search_result_column_snippet": "Ausschnitt",
+    "insights_title": "Gesprächsstatistik",
+    "insights_no_data": "Noch keine Nachrichten vorhanden.",
+    "insights_total": "Nachrichten insgesamt",
+    "insights_user": "Du",
+    "insights_assistant": "Gemini",
+    "insights_span": "Zeitraum",
+    "insights_avg_user_length": "Ø Länge deiner Nachrichten",
+    "insights_avg_response_time": "Ø Antwortzeit von Gemini",
+    "unit_seconds": "Sek.",
+    "unit_characters": "Zeichen",
         "history_saved": "Chat-Historie gespeichert.",
         "history_loaded": "Chat-Historie geladen.",
         "history_cleared": "Chat-Historie geleert.",
@@ -126,7 +146,7 @@ LANG = {
         "help_text": (
             "Verfügbare Shortcuts:\n"
             ":q - Beenden\n:s - Historie speichern\n:l - Historie laden\n"
-            ":o - Optionen\n:c - Historie leeren\n:x - Historie als Markdown exportieren\n:h - Hilfe"
+            ":o - Optionen\n:c - Historie leeren\n:x - Historie als Markdown exportieren\n:f - Verlauf durchsuchen\n:i - Statistik anzeigen\n:h - Hilfe"
         ),
         "output_plain": "Klartext",
         "output_markdown": "Markdown",
@@ -189,9 +209,27 @@ LANG = {
     "history_exported": "History exported to {path}.",
     "history_export_failed": "Markdown export failed: {error}",
     "history_empty_export": "No entries to export yet.",
+    "history_empty": "History is empty so far.",
     "role_user": "You",
     "role_assistant": "Gemini",
     "role_system": "System",
+    "search_prompt": "Enter search term (press Enter to cancel): ",
+    "search_no_results": "No matches found.",
+    "search_results_title": "Search results",
+    "search_result_column_index": "#",
+    "search_result_column_role": "Role",
+    "search_result_column_time": "Time",
+    "search_result_column_snippet": "Snippet",
+    "insights_title": "Conversation insights",
+    "insights_no_data": "No messages yet.",
+    "insights_total": "Total messages",
+    "insights_user": "You",
+    "insights_assistant": "Gemini",
+    "insights_span": "Time span",
+    "insights_avg_user_length": "Avg. length of your messages",
+    "insights_avg_response_time": "Avg. Gemini response time",
+    "unit_seconds": "s",
+    "unit_characters": "chars",
         "history_saved": "Chat history saved.",
         "history_loaded": "Chat history reloaded.",
         "history_cleared": "Chat history cleared.",
@@ -203,7 +241,7 @@ LANG = {
         "help_text": (
             "Available shortcuts:\n"
             ":q - Quit\n:s - Save history\n:l - Load history\n"
-            ":o - Settings\n:c - Clear history\n:x - Export history as Markdown\n:h - Help"
+            ":o - Settings\n:c - Clear history\n:x - Export history as Markdown\n:f - Search history\n:i - Conversation insights\n:h - Help"
         ),
         "output_plain": "Plain",
         "output_markdown": "Markdown",
@@ -736,6 +774,10 @@ class TerminalApp:
                 self.console.print(Panel.fit(self.lang["history_cleared"], style="yellow"))
         elif command == "x":
             self.export_history_markdown()
+        elif command == "f":
+            self.search_history()
+        elif command == "i":
+            self.show_history_insights()
         elif command == "o":
             self.open_options()
         else:
@@ -954,6 +996,158 @@ class TerminalApp:
             "model": self.lang.get("role_assistant", "Assistant"),
             "system": self.lang.get("role_system", "System"),
         }
+
+    def search_history(self) -> None:
+        if not self.history_manager.entries:
+            self.console.print(Panel.fit(self.lang["history_empty"], style="yellow"))
+            return
+
+        query = self.console.input(self.lang["search_prompt"]).strip()
+        if not query:
+            return
+
+        query_lower = query.lower()
+        results = []
+        labels = self._get_role_labels_for_export()
+        for index, entry in enumerate(self.history_manager.entries, start=1):
+            content = entry.get("content", "")
+            if not isinstance(content, str):
+                continue
+            if query_lower not in content.lower():
+                continue
+            ts_str = ChatHistoryManager._format_timestamp(entry.get("timestamp", "")) or "—"
+            role = entry.get("role", "assistant")
+            label = labels.get(role, role.capitalize())
+            snippet = self._build_highlight_snippet(content, query)
+            results.append((index, label, ts_str, snippet))
+
+        if not results:
+            self.console.print(Panel.fit(self.lang["search_no_results"], style="yellow"))
+            return
+
+        table = Table(title=self.lang["search_results_title"], box=box.ROUNDED)
+        table.add_column(self.lang["search_result_column_index"], style="cyan", justify="right")
+        table.add_column(self.lang["search_result_column_role"], style="magenta")
+        table.add_column(self.lang["search_result_column_time"], style="green")
+        table.add_column(self.lang["search_result_column_snippet"], style="white")
+
+        for idx, role, timestamp, snippet in results:
+            table.add_row(str(idx), role, timestamp, snippet)
+
+        self.console.print(table)
+
+    def show_history_insights(self) -> None:
+        entries = self.history_manager.entries
+        if not entries:
+            self.console.print(Panel.fit(self.lang["insights_no_data"], style="yellow"))
+            return
+
+        total_messages = len(entries)
+        user_messages = [e for e in entries if e.get("role") == "user"]
+        assistant_messages = [
+            e for e in entries if e.get("role") in {"assistant", "model"}
+        ]
+
+        first_ts = self._parse_timestamp(entries[0].get("timestamp"))
+        last_ts = self._parse_timestamp(entries[-1].get("timestamp"))
+
+        if first_ts and last_ts:
+            span = f"{ChatHistoryManager._format_timestamp(entries[0].get('timestamp', ''))} – " \
+                   f"{ChatHistoryManager._format_timestamp(entries[-1].get('timestamp', ''))}"
+        else:
+            span = "—"
+
+        avg_user_length = self._compute_average_length(user_messages)
+        avg_response_time = self._compute_average_response_time(entries)
+
+        table = Table(
+            title=self.lang["insights_title"], box=box.ROUNDED, show_edge=False, show_header=False
+        )
+        table.add_column(style="cyan", no_wrap=True)
+        table.add_column(style="white")
+        table.add_row(self.lang["insights_total"], str(total_messages))
+        table.add_row(self.lang["insights_user"], str(len(user_messages)))
+        table.add_row(self.lang["insights_assistant"], str(len(assistant_messages)))
+        table.add_row(self.lang["insights_span"], span)
+        table.add_row(
+            self.lang["insights_avg_user_length"],
+            self._format_length(avg_user_length),
+        )
+        table.add_row(
+            self.lang["insights_avg_response_time"],
+            self._format_seconds(avg_response_time),
+        )
+
+        self.console.print(table)
+
+    def _compute_average_length(self, messages: List[Dict[str, Any]]) -> Optional[float]:
+        lengths = [len(m.get("content", "")) for m in messages if isinstance(m.get("content"), str)]
+        if not lengths:
+            return None
+        return sum(lengths) / len(lengths)
+
+    def _compute_average_response_time(self, entries: List[Dict[str, Any]]) -> Optional[float]:
+        deltas: List[float] = []
+        pending_user_ts: Optional[datetime] = None
+        for entry in entries:
+            role = entry.get("role")
+            ts = self._parse_timestamp(entry.get("timestamp"))
+            if ts is None:
+                continue
+            if role == "user":
+                pending_user_ts = ts
+            elif role in {"assistant", "model"} and pending_user_ts is not None:
+                delta = (ts - pending_user_ts).total_seconds()
+                if delta >= 0:
+                    deltas.append(delta)
+                pending_user_ts = None
+        if not deltas:
+            return None
+        return sum(deltas) / len(deltas)
+
+    def _format_length(self, value: Optional[float]) -> str:
+        if value is None:
+            return "—"
+        return f"{value:.0f} {self.lang['unit_characters']}"
+
+    def _format_seconds(self, value: Optional[float]) -> str:
+        if value is None:
+            return "—"
+        return f"{value:.1f} {self.lang['unit_seconds']}"
+
+    def _parse_timestamp(self, value: Optional[str]) -> Optional[datetime]:
+        if not value:
+            return None
+        try:
+            dt = datetime.fromisoformat(value)
+        except ValueError:
+            return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        else:
+            dt = dt.astimezone(timezone.utc)
+        return dt
+
+    def _build_highlight_snippet(self, content: str, query: str, radius: int = 60) -> Text:
+        content_single_line = re.sub(r"\s+", " ", content.strip())
+        lower_content = content_single_line.lower()
+        lower_query = query.lower()
+        index = lower_content.find(lower_query)
+        if index == -1:
+            snippet = content_single_line[: radius * 2 + len(query)]
+        else:
+            start = max(index - radius, 0)
+            end = min(index + len(query) + radius, len(content_single_line))
+            snippet = content_single_line[start:end]
+            if start > 0:
+                snippet = "…" + snippet
+            if end < len(content_single_line):
+                snippet = snippet + "…"
+
+        text = Text(snippet)
+        pattern = re.compile(re.escape(query), flags=re.IGNORECASE)
+        text.highlight_regex(pattern, style="bold magenta")
+        return text
 
     def process_user_message(self, message: str) -> None:
         if not self.settings_manager.settings.api_key:
