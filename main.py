@@ -43,7 +43,7 @@ CONFIG_PATH = Path("config.json")
 DEFAULT_HISTORY_PATH = Path("history.json")
 DEFAULT_MODEL = "gemini-2.5-flash"
 # Vom Nutzer bereitgestellter API-Key
-DEFAULT_API_KEY = "AIzaSyAuu8RN779mRyz5p_k7bUMRvJmC6xuPQDA"
+DEFAULT_API_KEY = "Test"
 DEFAULT_REQUEST_TIMEOUT = 120
 SUGGESTED_MODELS = [
     "gemini-2.5-pro",
