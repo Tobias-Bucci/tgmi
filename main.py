@@ -8,14 +8,22 @@ from __future__ import annotations
 import copy
 import json
 import os
+import os
+import json
+import markdown
+import string
+import logging
+import hashlib
+import asyncio
+import aiohttp
 import re
-import shutil
-import subprocess
-import sys
 import time
+from pathlib import Path
 from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
-from pathlib import Path
+import sys
+import shutil
+import subprocess
 from typing import Any, Dict, List, Optional
 
 import requests
@@ -385,7 +393,7 @@ class ChatHistoryManager:
             {
                 "role": role,
                 "content": content,
-                "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             }
         )
 
