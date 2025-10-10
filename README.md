@@ -41,6 +41,7 @@ python main.py
 | `:x`     | Historie als Markdown exportieren  |
 | `:f`     | Verlauf nach Stichwort durchsuchen |
 | `:i`     | Gesprächsstatistik anzeigen        |
+| `:cp`    | Letzte Antwort kopieren            |
 
 ### Einstellungen
 
@@ -53,7 +54,7 @@ Im Optionsmenü können folgende Parameter angepasst werden:
 - Denkmode (für Modelle mit erweiterten Reasoning-Fähigkeiten)
 - Maximale Antwort-Tokens (leer lassen für unbegrenzt oder bei Bedarf erhöhen)
 - HTTP-Timeout für API-Aufrufe (praktisch bei sehr langen Antworten)
-- „Antwort kopieren“-Schaltfläche bei jeder KI-Antwort (kopiert den Rohtext gemäß aktuellem Ausgabeformat)
+- Shortcut `:cp`, der die letzte KI-Antwort erneut in die Zwischenablage kopiert
 
 > **Hinweis:** Falls der Standardwert `gemini-2.5-flash` in deiner Region nicht verfügbar ist, kannst du über `:o` → „Modell ändern“ direkt auf ein anderes Modell wechseln.
 
@@ -68,7 +69,7 @@ Unterstützte Modellkandidaten:
 - `gemini-live-2.5-flash-preview-native-audio`
 - (Legacy) `gemini-1.5-flash`, `gemini-1.5-pro`
 
-Der Denkmode lässt sich für die Modelle `gemini-2.5-*` sowie `gemini-2.0-*` aktivieren; das Programm ergänzt dann intern eine ausführliche Systemanweisung und passt die Sampling-Parameter für bessere Reasoning-Antworten an. Während das Modell denkt, zeigt der Client einen temporären Hinweis an, der nach Abschluss automatisch verschwindet. Nach jeder Antwort erscheint zusätzlich eine Schaltfläche, über die sich der angezeigte Text (Markdown oder Plaintext) in die Zwischenablage kopieren lässt.
+Der Denkmode lässt sich für die Modelle `gemini-2.5-*` sowie `gemini-2.0-*` aktivieren; das Programm ergänzt dann intern eine ausführliche Systemanweisung und passt die Sampling-Parameter für bessere Reasoning-Antworten an. Während das Modell denkt, zeigt der Client einen temporären Hinweis an, der nach Abschluss automatisch verschwindet. Nach jeder Antwort kannst du bei Bedarf mit `:cp` den angezeigten Text (Markdown oder Plaintext) in die Zwischenablage kopieren.
 
 > Tipp: Für beste Kompatibilität bei der Zwischenablage kannst du optional `pyperclip` installieren (`pip install pyperclip`). Andernfalls versucht die Anwendung, plattformspezifische Tools wie `clip`, `pbcopy`, `wl-copy` oder `xclip` zu verwenden.
 

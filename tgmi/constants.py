@@ -80,11 +80,9 @@ LANG: Dict[str, Dict[str, str]] = {
         "thinking_disabled": "Denkmode deaktiviert.",
         "thinking_unavailable": "Für dieses Modell ist der Denkmode nicht verfügbar.",
         "thinking_in_progress": "Denkmode aktiv – Gemini denkt…",
-        "copy_panel_title": "Antwort kopieren",
-        "copy_instruction": "[c] Kopieren  ·  [Enter] überspringen",
-        "copy_prompt": "Aktion wählen (c/Enter): ",
         "copy_success": "Antwort wurde in die Zwischenablage kopiert.",
         "copy_failure": "Antwort konnte nicht kopiert werden.",
+        "copy_no_response": "Es liegt keine Antwort zum Kopieren vor.",
         "export_prompt": "Dateiname für Markdown-Export angeben (Enter für {path}): ",
         "history_exported": "Markdown-Export gespeichert unter {path}.",
         "history_export_failed": "Markdown-Export fehlgeschlagen: {error}",
@@ -121,7 +119,7 @@ LANG: Dict[str, Dict[str, str]] = {
         "help_text": (
             "Verfügbare Shortcuts:\n"
             ":q - Beenden\n:s - Historie speichern\n:l - Historie laden\n"
-            ":o - Optionen\n:c - Historie leeren\n:x - Historie als Markdown exportieren\n:f - Verlauf durchsuchen\n:i - Statistik anzeigen\n:h - Hilfe"
+            ":o - Optionen\n:c - Historie leeren\n:x - Historie als Markdown exportieren\n:f - Verlauf durchsuchen\n:i - Statistik anzeigen\n:h - Hilfe\n:cp - Letzte Antwort kopieren"
         ),
         "file_command_hint": "Zeilen mit # <Pfad> oder ! <Pfad> fügen Dateien zur nächsten Nachricht hinzu.",
         "file_attached": "Datei angehängt: {path}",
@@ -181,11 +179,9 @@ LANG: Dict[str, Dict[str, str]] = {
         "thinking_disabled": "Thinking mode disabled.",
         "thinking_unavailable": "This model does not support the extended thinking mode.",
         "thinking_in_progress": "Thinking mode active – Gemini is reasoning…",
-        "copy_panel_title": "Copy response",
-        "copy_instruction": "[c] Copy  ·  [Enter] skip",
-        "copy_prompt": "Choose action (c/Enter): ",
         "copy_success": "Response copied to clipboard.",
         "copy_failure": "Could not copy the response to the clipboard.",
+        "copy_no_response": "There is no response available to copy.",
         "export_prompt": "Enter filename for Markdown export (press Enter for {path}): ",
         "history_exported": "History exported to {path}.",
         "history_export_failed": "Markdown export failed: {error}",
@@ -222,7 +218,7 @@ LANG: Dict[str, Dict[str, str]] = {
         "help_text": (
             "Available shortcuts:\n"
             ":q - Quit\n:s - Save history\n:l - Load history\n"
-            ":o - Settings\n:c - Clear history\n:x - Export history as Markdown\n:f - Search history\n:i - Conversation insights\n:h - Help"
+            ":o - Settings\n:c - Clear history\n:x - Export history as Markdown\n:f - Search history\n:i - Conversation insights\n:h - Help\n:cp - Copy last response"
         ),
         "file_command_hint": "Lines starting with # <path> or ! <path> attach files to the next request.",
         "file_attached": "Attached file: {path}",

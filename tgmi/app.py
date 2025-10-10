@@ -9,12 +9,11 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from rich import box
-from rich.align import Align
 from rich.console import Console
 from rich.live import Live
 from rich.markdown import Markdown
 from rich.panel import Panel
-from rich.prompt import Confirm, Prompt
+from rich.prompt import Confirm
 from rich.spinner import Spinner
 from rich.table import Table
 
@@ -91,6 +90,7 @@ class TerminalApp:
         self._ensure_api_key()
         self._refresh_language()
         self.workspace_root = Path.cwd()
+        self._last_response: Optional[str] = None
 
     def _ensure_api_key(self) -> None:
         if not self.settings_manager.settings.api_key:
@@ -155,6 +155,8 @@ class TerminalApp:
             self.show_history_insights()
         elif command == "o":
             self.open_options()
+        elif command == "cp":
+            self.copy_last_response()
         else:
             self.console.print(Panel.fit(self.lang["invalid_choice"], style="yellow"))
         return False
@@ -622,29 +624,19 @@ class TerminalApp:
         return False
 
     def display_response(self, response: str) -> None:
+        self._last_response = response
         if self.settings_manager.settings.output_format == "markdown":
             rendered = Markdown(response)
         else:
             rendered = response
         panel = Panel(rendered, title=f"{self.lang['model_label']} ({self.settings_manager.settings.model})", border_style="magenta", box=box.ROUNDED)
         self.console.print(panel)
-        self._offer_copy_option(response)
 
-    def _offer_copy_option(self, response: str) -> None:
-        instruction = Align.center(self.lang["copy_instruction"], vertical="middle")
-        panel = Panel(instruction, title=self.lang["copy_panel_title"], border_style="cyan", box=box.ROUNDED)
-        self.console.print(panel)
-        skip_token = "skip"
-        choice = Prompt.ask(
-            f"[bold]{self.lang['copy_prompt']}[/bold]",
-            choices=["c", skip_token],
-            default=skip_token,
-            show_choices=False,
-        )
-        if choice.lower() != "c":
+    def copy_last_response(self) -> None:
+        if not self._last_response:
+            self.console.print(Panel.fit(self.lang["copy_no_response"], style="yellow"))
             return
-        text_to_copy = response
-        success = ClipboardHelper.copy_text(text_to_copy)
+        success = ClipboardHelper.copy_text(self._last_response)
         if success:
             self.console.print(Panel.fit(self.lang["copy_success"], style="green"))
         else:
