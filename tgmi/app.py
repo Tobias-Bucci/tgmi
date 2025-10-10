@@ -1,11 +1,12 @@
 """Console application flow for the Gemini terminal client."""
 from __future__ import annotations
 
+import re
 import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from rich import box
 from rich.align import Align
@@ -33,6 +34,49 @@ from .settings import SettingsManager
 class TerminalApp:
     """Handle user interaction inside the terminal."""
 
+    FILE_COMMAND_PATTERN = re.compile(r"^\s*([#!])\s+(.+)$")
+    CODE_FENCE_MAP = {
+        ".py": "python",
+        ".pyw": "python",
+        ".js": "javascript",
+        ".ts": "typescript",
+        ".tsx": "tsx",
+        ".jsx": "jsx",
+        ".json": "json",
+        ".md": "markdown",
+        ".html": "html",
+        ".htm": "html",
+        ".css": "css",
+        ".yml": "yaml",
+        ".yaml": "yaml",
+        ".toml": "toml",
+        ".ini": "ini",
+        ".cfg": "ini",
+        ".sh": "bash",
+        ".bash": "bash",
+        ".zsh": "bash",
+        ".ps1": "powershell",
+        ".psm1": "powershell",
+        ".bat": "batch",
+        ".cmd": "batch",
+        ".java": "java",
+        ".kt": "kotlin",
+        ".kts": "kotlin",
+        ".cs": "csharp",
+        ".cpp": "cpp",
+        ".cc": "cpp",
+        ".cxx": "cpp",
+        ".c": "c",
+        ".h": "c",
+        ".hpp": "cpp",
+        ".rs": "rust",
+        ".go": "go",
+        ".rb": "ruby",
+        ".php": "php",
+        ".swift": "swift",
+        ".sql": "sql",
+    }
+
     def __init__(self) -> None:
         self.console = Console()
         self.settings_manager = SettingsManager()
@@ -46,6 +90,7 @@ class TerminalApp:
         )
         self._ensure_api_key()
         self._refresh_language()
+        self.workspace_root = Path.cwd()
 
     def _ensure_api_key(self) -> None:
         if not self.settings_manager.settings.api_key:
@@ -81,7 +126,8 @@ class TerminalApp:
         self.console.print(welcome_panel)
 
     def show_help(self) -> None:
-        help_panel = Panel(self.lang["help_text"], title=self.lang["help_title"], border_style="green", box=box.ROUNDED)
+        help_text = f"{self.lang['help_text']}\n\n{self.lang['file_command_hint']}"
+        help_panel = Panel(help_text, title=self.lang["help_title"], border_style="green", box=box.ROUNDED)
         self.console.print(help_panel)
 
     def handle_shortcut(self, command: str) -> bool:
@@ -449,6 +495,17 @@ class TerminalApp:
             self.console.print(Panel.fit(self.lang["missing_key"], style="red"))
             return
 
+        prepared_message, attached_paths, attachment_errors = self._prepare_message_with_files(message)
+        for error in attachment_errors:
+            self.console.print(Panel.fit(error, style="red", border_style="red", title=self.lang["error"]))
+        for path in attached_paths:
+            display = self._format_display_path(path)
+            self.console.print(Panel.fit(self.lang["file_attached"].format(path=display), style="cyan"))
+
+        if not prepared_message:
+            self.console.print(Panel.fit(self.lang["message_empty"], style="yellow"))
+            return
+
         thinking_enabled = self.is_thinking_enabled()
         generation_config = self._build_generation_config(thinking_enabled)
         status_message = self.lang["thinking_in_progress"] if thinking_enabled else self.lang["sending"]
@@ -458,7 +515,7 @@ class TerminalApp:
             with Live(status_panel, refresh_per_second=12, console=self.console, transient=True):
                 response = self.client.send_message(
                     self.history_manager.build_gemini_payload(),
-                    message,
+                    prepared_message,
                     system_instruction=THINKING_SYSTEM_PROMPT if thinking_enabled else None,
                     generation_config=generation_config,
                 )
@@ -466,10 +523,103 @@ class TerminalApp:
             self.console.print(Panel.fit(self.lang["http_error"].format(detail=str(exc)), title=self.lang["error"], style="red"))
             return
 
-        self.history_manager.add_entry("user", message)
+        self.history_manager.add_entry("user", prepared_message)
         self.history_manager.add_entry("assistant", response)
         self.history_manager.save()
         self.display_response(response)
+
+    def _prepare_message_with_files(self, raw_message: str) -> Tuple[str, List[Path], List[str]]:
+        attachments: List[Tuple[Path, str]] = []
+        errors: List[str] = []
+        lines: List[str] = []
+
+        for line in raw_message.splitlines():
+            match = self.FILE_COMMAND_PATTERN.match(line)
+            if not match:
+                lines.append(line)
+                continue
+
+            path_string = match.group(2).strip()
+            if not path_string:
+                lines.append(line)
+                continue
+
+            cleaned_path = self._strip_quotes(path_string)
+            if not self._looks_like_path(cleaned_path):
+                lines.append(line)
+                continue
+            attachment = self._read_attachment(cleaned_path)
+            if isinstance(attachment, tuple):
+                path_obj, content = attachment
+                attachments.append((path_obj, content))
+            else:
+                errors.append(attachment)
+
+        base_message = "\n".join(lines).strip()
+        attachment_blocks = [self._format_attachment_block(path, content) for path, content in attachments]
+        combined_message = base_message
+        if attachment_blocks:
+            attachments_text = "\n\n".join(attachment_blocks)
+            combined_message = f"{base_message}\n\n{attachments_text}" if base_message else attachments_text
+
+        attached_paths = [path for path, _ in attachments]
+        return combined_message, attached_paths, errors
+
+    def _strip_quotes(self, value: str) -> str:
+        if (value.startswith("\"") and value.endswith("\"")) or (value.startswith("'") and value.endswith("'")):
+            return value[1:-1]
+        return value
+
+    def _read_attachment(self, path_string: str) -> Tuple[Path, str] | str:
+        candidate = Path(path_string).expanduser()
+        if not candidate.is_absolute():
+            candidate = (self.workspace_root / candidate).resolve(strict=False)
+        else:
+            candidate = candidate.resolve(strict=False)
+
+        if not candidate.exists():
+            return self.lang["file_not_found"].format(path=str(candidate))
+        if not candidate.is_file():
+            return self.lang["file_not_file"].format(path=str(candidate))
+
+        try:
+            text = candidate.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            try:
+                text = candidate.read_text(encoding="utf-8", errors="replace")
+            except OSError as exc:
+                return self.lang["file_read_error"].format(path=str(candidate), error=str(exc))
+        except OSError as exc:
+            return self.lang["file_read_error"].format(path=str(candidate), error=str(exc))
+
+        return candidate, text
+
+    def _format_attachment_block(self, path: Path, content: str) -> str:
+        fence = self._detect_code_fence(path)
+        header = f"File: {path}"
+        body = content.rstrip("\n")
+        if not body:
+            body = "(empty file)"
+        return f"{header}\n```{fence}\n{body}\n```"
+
+    def _detect_code_fence(self, path: Path) -> str:
+        suffix = path.suffix.lower()
+        return self.CODE_FENCE_MAP.get(suffix, "text")
+
+    def _format_display_path(self, path: Path) -> str:
+        try:
+            return str(path.relative_to(self.workspace_root))
+        except ValueError:
+            return str(path)
+
+    def _looks_like_path(self, candidate: str) -> bool:
+        if not candidate:
+            return False
+        if any(sep in candidate for sep in ("/", "\\")):
+            return True
+        if "." in candidate:
+            return True
+        return False
 
     def display_response(self, response: str) -> None:
         if self.settings_manager.settings.output_format == "markdown":

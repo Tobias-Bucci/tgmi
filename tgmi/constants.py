@@ -123,6 +123,12 @@ LANG: Dict[str, Dict[str, str]] = {
             ":q - Beenden\n:s - Historie speichern\n:l - Historie laden\n"
             ":o - Optionen\n:c - Historie leeren\n:x - Historie als Markdown exportieren\n:f - Verlauf durchsuchen\n:i - Statistik anzeigen\n:h - Hilfe"
         ),
+        "file_command_hint": "Zeilen mit # <Pfad> oder ! <Pfad> fügen Dateien zur nächsten Nachricht hinzu.",
+        "file_attached": "Datei angehängt: {path}",
+        "file_not_found": "Datei nicht gefunden: {path}",
+        "file_not_file": "Pfad ist keine Datei: {path}",
+        "file_read_error": "Datei konnte nicht gelesen werden: {path} ({error})",
+        "message_empty": "Es ist keine Nachricht vorhanden, die gesendet werden könnte.",
         "output_plain": "Klartext",
         "output_markdown": "Markdown",
         "language_prompt": "Sprache wählen (de/en): ",
@@ -218,6 +224,12 @@ LANG: Dict[str, Dict[str, str]] = {
             ":q - Quit\n:s - Save history\n:l - Load history\n"
             ":o - Settings\n:c - Clear history\n:x - Export history as Markdown\n:f - Search history\n:i - Conversation insights\n:h - Help"
         ),
+        "file_command_hint": "Lines starting with # <path> or ! <path> attach files to the next request.",
+        "file_attached": "Attached file: {path}",
+        "file_not_found": "File not found: {path}",
+        "file_not_file": "Path is not a file: {path}",
+        "file_read_error": "Could not read file: {path} ({error})",
+        "message_empty": "There is no message to send after processing file commands.",
         "output_plain": "Plain",
         "output_markdown": "Markdown",
         "language_prompt": "Select language (de/en): ",
