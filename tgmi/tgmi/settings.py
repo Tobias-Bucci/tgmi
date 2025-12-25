@@ -18,7 +18,6 @@ class Settings:
 
     api_key: str = DEFAULT_API_KEY
     model: str = DEFAULT_MODEL
-    language: str = "en"
     output_format: str = "markdown"
     history_path: str = str(DEFAULT_HISTORY_PATH)
     extended_thinking: bool = False
@@ -48,7 +47,7 @@ class SettingsManager:
                 return settings
             except (json.JSONDecodeError, TypeError):
                 Console().print(
-                    Panel.fit("<config.json> konnte nicht gelesen werden – Standardwerte werden genutzt.", style="red")
+                    Panel.fit("Could not read <config.json> – using default values.", style="red")
                 )
         return Settings()
 

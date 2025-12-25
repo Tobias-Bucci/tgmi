@@ -20,7 +20,7 @@ from rich.table import Table
 from .client import GeminiClient
 from .clipboard import ClipboardHelper
 from .constants import (
-    LANG,
+    MESSAGES,
     SUGGESTED_MODELS,
     THINKING_GENERATION_CONFIG_BASE,
     THINKING_MODELS,
@@ -89,26 +89,18 @@ class TerminalApp:
             max_output_tokens_retry=self._determine_retry_limit(),
         )
         self._ensure_api_key()
-        self._refresh_language()
         self.workspace_root = Path.cwd()
         self._last_response: Optional[str] = None
 
     def _ensure_api_key(self) -> None:
         if not self.settings_manager.settings.api_key:
-            self.console.print(Panel.fit(self.lang["missing_key"], style="red"))
-
-    def _refresh_language(self) -> None:
-        language = self.settings_manager.settings.language.lower()
-        if language not in LANG:
-            language = "de"
-            self.settings_manager.update(language=language)
-        self.lang = LANG[language]
+            self.console.print(Panel.fit(MESSAGES["missing_key"], style="red"))
 
     def run(self) -> None:
         self._print_welcome()
         self.show_help()
         while True:
-            user_input = self.console.input(self.lang["prompt"]).strip()
+            user_input = self.console.input(MESSAGES["prompt"]).strip()
             if not user_input:
                 continue
             if user_input.startswith(":"):
@@ -119,7 +111,7 @@ class TerminalApp:
 
     def _print_welcome(self) -> None:
         welcome_panel = Panel(
-            self.lang["welcome"],
+            MESSAGES["welcome"],
             title="Gemini",
             border_style="cyan",
             box=box.ROUNDED,
@@ -127,30 +119,30 @@ class TerminalApp:
         self.console.print(welcome_panel)
 
     def show_help(self) -> None:
-        help_text = f"{self.lang['help_text']}\n\n{self.lang['file_command_hint']}"
-        help_panel = Panel(help_text, title=self.lang["help_title"], border_style="green", box=box.ROUNDED)
+        help_text = f"{MESSAGES['help_text']}\n\n{MESSAGES['file_command_hint']}"
+        help_panel = Panel(help_text, title=MESSAGES["help_title"], border_style="green", box=box.ROUNDED)
         self.console.print(help_panel)
 
     def handle_shortcut(self, command: str) -> bool:
         if command == "q":
-            self.console.print(Panel.fit(self.lang["goodbye"], style="magenta"))
+            self.console.print(Panel.fit(MESSAGES["goodbye"], style="magenta"))
             return True
         if command == "h":
             self.show_help()
         elif command == "s":
             self.history_manager.save()
             timestamp = datetime.now().strftime("%H:%M:%S")
-            self.console.print(Panel.fit(self.lang["status_saved_at"].format(time=timestamp), style="green"))
+            self.console.print(Panel.fit(MESSAGES["status_saved_at"].format(time=timestamp), style="green"))
         elif command == "l":
             self.history_manager.load()
-            self.console.print(Panel.fit(self.lang["history_loaded"], style="green"))
+            self.console.print(Panel.fit(MESSAGES["history_loaded"], style="green"))
         elif command == "c":
-            if Confirm.ask(self.lang["confirm_clear"], default=False):
+            if Confirm.ask(MESSAGES["confirm_clear"], default=False):
                 self.history_manager.clear()
-                self.console.print(Panel.fit(self.lang["history_cleared"], style="yellow"))
+                self.console.print(Panel.fit(MESSAGES["history_cleared"], style="yellow"))
         elif command == "n":
             self.history_manager.start_new_session()
-            self.console.print(Panel.fit(self.lang["new_chat_started"], style="green"))
+            self.console.print(Panel.fit(MESSAGES["new_chat_started"], style="green"))
         elif command == "x":
             self.export_history_markdown()
         elif command == "f":
@@ -162,128 +154,113 @@ class TerminalApp:
         elif command == "cp":
             self.copy_last_response()
         else:
-            self.console.print(Panel.fit(self.lang["invalid_choice"], style="yellow"))
+            self.console.print(Panel.fit(MESSAGES["invalid_choice"], style="yellow"))
         return False
 
     def open_options(self) -> None:
         while True:
-            table = Table(title=self.lang["options_title"], box=box.SIMPLE, show_edge=False)
+            table = Table(title=MESSAGES["options_title"], box=box.SIMPLE, show_edge=False)
             table.add_column("#", style="cyan")
             table.add_column("Option", style="white")
-            for row in self.lang["options_menu"].splitlines():
+            for row in MESSAGES["options_menu"].splitlines():
                 number, text = row.split(") ", maxsplit=1)
                 table.add_row(number, text)
             table.add_row(
                 "-",
-                self.lang["current_language"].format(lang=self.settings_manager.settings.language.upper()),
+                MESSAGES["current_format"].format(fmt=self.settings_manager.settings.output_format),
             )
             table.add_row(
                 "-",
-                self.lang["current_format"].format(fmt=self.settings_manager.settings.output_format),
-            )
-            table.add_row(
-                "-",
-                self.lang["current_model"].format(model=self.settings_manager.settings.model),
+                MESSAGES["current_model"].format(model=self.settings_manager.settings.model),
             )
             max_tokens = self.settings_manager.settings.max_output_tokens
             if isinstance(max_tokens, int) and max_tokens > 0:
                 max_tokens_label = str(max_tokens)
             else:
-                max_tokens_label = self.lang["max_tokens_unlimited"]
+                max_tokens_label = MESSAGES["max_tokens_unlimited"]
             table.add_row(
                 "-",
-                self.lang["current_max_tokens"].format(value=max_tokens_label),
+                MESSAGES["current_max_tokens"].format(value=max_tokens_label),
             )
             table.add_row(
                 "-",
-                self.lang["current_timeout"].format(seconds=self.settings_manager.settings.request_timeout),
+                MESSAGES["current_timeout"].format(seconds=self.settings_manager.settings.request_timeout),
             )
             supports_thinking = self.settings_manager.settings.model in THINKING_MODELS
             if self.settings_manager.settings.extended_thinking and not supports_thinking:
-                thinking_state = f"{self.lang['thinking_state_off']} ({self.lang['thinking_state_blocked']})"
+                thinking_state = f"{MESSAGES['thinking_state_off']} ({MESSAGES['thinking_state_blocked']})"
             elif self.is_thinking_enabled():
-                thinking_state = self.lang["thinking_state_on"]
+                thinking_state = MESSAGES["thinking_state_on"]
             else:
-                thinking_state = self.lang["thinking_state_off"]
+                thinking_state = MESSAGES["thinking_state_off"]
             table.add_row(
                 "-",
-                self.lang["current_thinking"].format(state=thinking_state),
+                MESSAGES["current_thinking"].format(state=thinking_state),
             )
             
             if self.settings_manager.settings.hacking_mode:
-                hacking_state = self.lang["hacking_mode_on"]
+                hacking_state = MESSAGES["hacking_mode_on"]
             else:
-                hacking_state = self.lang["hacking_mode_off"]
+                hacking_state = MESSAGES["hacking_mode_off"]
             table.add_row(
                 "-",
-                self.lang["current_hacking_mode"].format(state=hacking_state),
+                MESSAGES["current_hacking_mode"].format(state=hacking_state),
             )
 
             self.console.print(table)
 
-            choice = self.console.input(self.lang["enter_choice"]).strip()
+            choice = self.console.input(MESSAGES["enter_choice"]).strip()
             if choice == "1":
                 self.update_api_key()
             elif choice == "2":
-                self.change_language()
-            elif choice == "3":
                 self.change_output_format()
-            elif choice == "4":
+            elif choice == "3":
                 self.change_model()
-            elif choice == "5":
+            elif choice == "4":
                 self.toggle_thinking_mode()
-            elif choice == "6":
+            elif choice == "5":
                 self.change_max_tokens()
-            elif choice == "7":
+            elif choice == "6":
                 self.change_timeout()
-            elif choice == "8":
+            elif choice == "7":
                 self.toggle_hacking_mode()
-            elif choice == "9":
+            elif choice == "8":
                 break
             else:
-                self.console.print(Panel.fit(self.lang["invalid_choice"], style="yellow"))
+                self.console.print(Panel.fit(MESSAGES["invalid_choice"], style="yellow"))
 
     def update_api_key(self) -> None:
-        new_key = self.console.input(self.lang["new_api_key"]).strip()
+        new_key = self.console.input(MESSAGES["new_api_key"]).strip()
         if new_key:
             self.settings_manager.update(api_key=new_key)
             self.client.update_key(new_key)
-            self.console.print(Panel.fit(self.lang["api_updated"], style="green"))
+            self.console.print(Panel.fit(MESSAGES["api_updated"], style="green"))
         else:
-            self.console.print(Panel.fit(self.lang["invalid_choice"], style="yellow"))
-
-    def change_language(self) -> None:
-        new_lang = self.console.input(self.lang["language_prompt"]).strip().lower()
-        if new_lang in LANG:
-            self.settings_manager.update(language=new_lang)
-            self._refresh_language()
-            self.console.print(Panel.fit(self.lang["language_updated"], style="green"))
-        else:
-            self.console.print(Panel.fit(self.lang["invalid_choice"], style="yellow"))
+            self.console.print(Panel.fit(MESSAGES["invalid_choice"], style="yellow"))
 
     def change_output_format(self) -> None:
-        new_format = self.console.input(self.lang["format_prompt"]).strip().lower()
+        new_format = self.console.input(MESSAGES["format_prompt"]).strip().lower()
         if new_format in {"plain", "markdown"}:
             self.settings_manager.update(output_format=new_format)
-            self.console.print(Panel.fit(self.lang["format_updated"], style="green"))
+            self.console.print(Panel.fit(MESSAGES["format_updated"], style="green"))
         else:
-            self.console.print(Panel.fit(self.lang["invalid_choice"], style="yellow"))
+            self.console.print(Panel.fit(MESSAGES["invalid_choice"], style="yellow"))
 
     def change_model(self) -> None:
         models_hint = ", ".join(SUGGESTED_MODELS)
-        self.console.print(Panel.fit(self.lang["available_models"].format(models=models_hint), style="cyan"))
-        new_model = self.console.input(self.lang["model_prompt"]).strip()
+        self.console.print(Panel.fit(MESSAGES["available_models"].format(models=models_hint), style="cyan"))
+        new_model = self.console.input(MESSAGES["model_prompt"]).strip()
         if new_model:
             self.settings_manager.update(model=new_model)
             self.client.update_model(new_model)
-            self.console.print(Panel.fit(self.lang["model_updated"], style="green"))
+            self.console.print(Panel.fit(MESSAGES["model_updated"], style="green"))
             if self.settings_manager.settings.extended_thinking:
                 if new_model in THINKING_MODELS:
-                    self.console.print(Panel.fit(self.lang["thinking_enabled"], style="cyan"))
+                    self.console.print(Panel.fit(MESSAGES["thinking_enabled"], style="cyan"))
                 else:
-                    self.console.print(Panel.fit(self.lang["thinking_unavailable"], style="yellow"))
+                    self.console.print(Panel.fit(MESSAGES["thinking_unavailable"], style="yellow"))
         else:
-            self.console.print(Panel.fit(self.lang["invalid_choice"], style="yellow"))
+            self.console.print(Panel.fit(MESSAGES["invalid_choice"], style="yellow"))
 
     def is_thinking_enabled(self) -> bool:
         return (
@@ -294,15 +271,15 @@ class TerminalApp:
     def toggle_thinking_mode(self) -> None:
         model = self.settings_manager.settings.model
         if model not in THINKING_MODELS:
-            self.console.print(Panel.fit(self.lang["thinking_unavailable"], style="yellow"))
+            self.console.print(Panel.fit(MESSAGES["thinking_unavailable"], style="yellow"))
             return
 
         new_state = not self.settings_manager.settings.extended_thinking
         self.settings_manager.update(extended_thinking=new_state)
         if new_state:
-            self.console.print(Panel.fit(self.lang["thinking_enabled"], style="green"))
+            self.console.print(Panel.fit(MESSAGES["thinking_enabled"], style="green"))
         else:
-            self.console.print(Panel.fit(self.lang["thinking_disabled"], style="green"))
+            self.console.print(Panel.fit(MESSAGES["thinking_disabled"], style="green"))
 
     def toggle_hacking_mode(self) -> None:
         new_state = not self.settings_manager.settings.hacking_mode
@@ -312,10 +289,10 @@ class TerminalApp:
         self.history_manager.start_new_session()
 
         if new_state:
-            self.console.print(Panel.fit(self.lang["hacking_mode_enabled"], style="green"))
+            self.console.print(Panel.fit(MESSAGES["hacking_mode_enabled"], style="green"))
             self.process_user_message(HACKING_MODE_PROMPT)
         else:
-            self.console.print(Panel.fit(self.lang["hacking_mode_disabled"], style="green"))
+            self.console.print(Panel.fit(MESSAGES["hacking_mode_disabled"], style="green"))
 
     def _determine_retry_limit(self) -> Optional[int]:
         max_tokens = self.settings_manager.settings.max_output_tokens
@@ -333,43 +310,43 @@ class TerminalApp:
         return config or None
 
     def change_max_tokens(self) -> None:
-        user_input = self.console.input(self.lang["max_tokens_prompt"]).strip()
+        user_input = self.console.input(MESSAGES["max_tokens_prompt"]).strip()
         if not user_input:
             self.settings_manager.update(max_output_tokens=None)
             self.client.update_max_output_tokens_retry(self._determine_retry_limit())
-            self.console.print(Panel.fit(self.lang["max_tokens_cleared"], style="green"))
+            self.console.print(Panel.fit(MESSAGES["max_tokens_cleared"], style="green"))
             return
         try:
             value = int(user_input)
             if value <= 0:
                 raise ValueError
         except ValueError:
-            self.console.print(Panel.fit(self.lang["invalid_choice"], style="yellow"))
+            self.console.print(Panel.fit(MESSAGES["invalid_choice"], style="yellow"))
             return
         self.settings_manager.update(max_output_tokens=value)
         self.client.update_max_output_tokens_retry(self._determine_retry_limit())
-        self.console.print(Panel.fit(self.lang["max_tokens_updated"], style="green"))
+        self.console.print(Panel.fit(MESSAGES["max_tokens_updated"], style="green"))
 
     def change_timeout(self) -> None:
-        user_input = self.console.input(self.lang["timeout_prompt"]).strip()
+        user_input = self.console.input(MESSAGES["timeout_prompt"]).strip()
         try:
             value = int(user_input)
             if value <= 0:
                 raise ValueError
         except (ValueError, TypeError):
-            self.console.print(Panel.fit(self.lang["invalid_choice"], style="yellow"))
+            self.console.print(Panel.fit(MESSAGES["invalid_choice"], style="yellow"))
             return
         self.settings_manager.update(request_timeout=value)
         self.client.update_timeout(value)
-        self.console.print(Panel.fit(self.lang["timeout_updated"], style="green"))
+        self.console.print(Panel.fit(MESSAGES["timeout_updated"], style="green"))
 
     def export_history_markdown(self) -> None:
         if not self.history_manager.entries:
-            self.console.print(Panel.fit(self.lang["history_empty_export"], style="yellow"))
+            self.console.print(Panel.fit(MESSAGES["history_empty_export"], style="yellow"))
             return
 
         default_path = Path(self.settings_manager.settings.history_path).with_suffix(".md")
-        user_input = self.console.input(self.lang["export_prompt"].format(path=default_path)).strip()
+        user_input = self.console.input(MESSAGES["export_prompt"].format(path=default_path)).strip()
         export_path = Path(user_input).expanduser() if user_input else default_path
 
         try:
@@ -378,35 +355,35 @@ class TerminalApp:
                 role_labels=self._get_role_labels_for_export(),
             )
         except ValueError:
-            self.console.print(Panel.fit(self.lang["history_empty_export"], style="yellow"))
+            self.console.print(Panel.fit(MESSAGES["history_empty_export"], style="yellow"))
         except Exception as exc:
             self.console.print(
                 Panel.fit(
-                    self.lang["history_export_failed"].format(error=str(exc)),
-                    title=self.lang["error"],
+                    MESSAGES["history_export_failed"].format(error=str(exc)),
+                    title=MESSAGES["error"],
                     style="red",
                 )
             )
         else:
             display_path = export_path.resolve()
             self.console.print(
-                Panel.fit(self.lang["history_exported"].format(path=display_path), style="green")
+                Panel.fit(MESSAGES["history_exported"].format(path=display_path), style="green")
             )
 
     def _get_role_labels_for_export(self) -> Dict[str, str]:
         return {
-            "user": self.lang.get("role_user", "User"),
-            "assistant": self.lang.get("role_assistant", "Assistant"),
-            "model": self.lang.get("role_assistant", "Assistant"),
-            "system": self.lang.get("role_system", "System"),
+            "user": MESSAGES.get("role_user", "User"),
+            "assistant": MESSAGES.get("role_assistant", "Assistant"),
+            "model": MESSAGES.get("role_assistant", "Assistant"),
+            "system": MESSAGES.get("role_system", "System"),
         }
 
     def search_history(self) -> None:
         if not self.history_manager.entries:
-            self.console.print(Panel.fit(self.lang["history_empty"], style="yellow"))
+            self.console.print(Panel.fit(MESSAGES["history_empty"], style="yellow"))
             return
 
-        query = self.console.input(self.lang["search_prompt"]).strip()
+        query = self.console.input(MESSAGES["search_prompt"]).strip()
         if not query:
             return
 
@@ -415,16 +392,16 @@ class TerminalApp:
             query,
             labels,
             column_titles={
-                "title": self.lang["search_results_title"],
-                "index": self.lang["search_result_column_index"],
-                "role": self.lang["search_result_column_role"],
-                "time": self.lang["search_result_column_time"],
-                "snippet": self.lang["search_result_column_snippet"],
+                "title": MESSAGES["search_results_title"],
+                "index": MESSAGES["search_result_column_index"],
+                "role": MESSAGES["search_result_column_role"],
+                "time": MESSAGES["search_result_column_time"],
+                "snippet": MESSAGES["search_result_column_snippet"],
             },
         )
 
         if len(table.rows) == 0:
-            self.console.print(Panel.fit(self.lang["search_no_results"], style="yellow"))
+            self.console.print(Panel.fit(MESSAGES["search_no_results"], style="yellow"))
             return
 
         self.console.print(table)
@@ -432,7 +409,7 @@ class TerminalApp:
     def show_history_insights(self) -> None:
         entries = self.history_manager.entries
         if not entries:
-            self.console.print(Panel.fit(self.lang["insights_no_data"], style="yellow"))
+            self.console.print(Panel.fit(MESSAGES["insights_no_data"], style="yellow"))
             return
 
         total_messages = len(entries)
@@ -454,20 +431,20 @@ class TerminalApp:
         avg_response_time = self._compute_average_response_time(entries)
 
         table = Table(
-            title=self.lang["insights_title"], box=box.ROUNDED, show_edge=False, show_header=False
+            title=MESSAGES["insights_title"], box=box.ROUNDED, show_edge=False, show_header=False
         )
         table.add_column(style="cyan", no_wrap=True)
         table.add_column(style="white")
-        table.add_row(self.lang["insights_total"], str(total_messages))
-        table.add_row(self.lang["insights_user"], str(len(user_messages)))
-        table.add_row(self.lang["insights_assistant"], str(len(assistant_messages)))
-        table.add_row(self.lang["insights_span"], span)
+        table.add_row(MESSAGES["insights_total"], str(total_messages))
+        table.add_row(MESSAGES["insights_user"], str(len(user_messages)))
+        table.add_row(MESSAGES["insights_assistant"], str(len(assistant_messages)))
+        table.add_row(MESSAGES["insights_span"], span)
         table.add_row(
-            self.lang["insights_avg_user_length"],
+            MESSAGES["insights_avg_user_length"],
             self._format_length(avg_user_length),
         )
         table.add_row(
-            self.lang["insights_avg_response_time"],
+            MESSAGES["insights_avg_response_time"],
             self._format_seconds(avg_response_time),
         )
 
@@ -501,12 +478,12 @@ class TerminalApp:
     def _format_length(self, value: Optional[float]) -> str:
         if value is None:
             return "—"
-        return f"{value:.0f} {self.lang['unit_characters']}"
+        return f"{value:.0f} {MESSAGES['unit_characters']}"
 
     def _format_seconds(self, value: Optional[float]) -> str:
         if value is None:
             return "—"
-        return f"{value:.1f} {self.lang['unit_seconds']}"
+        return f"{value:.1f} {MESSAGES['unit_seconds']}"
 
     def _parse_timestamp(self, value: Optional[str]) -> Optional[datetime]:
         if not value:
@@ -523,18 +500,18 @@ class TerminalApp:
 
     def process_user_message(self, message: str) -> None:
         if not self.settings_manager.settings.api_key:
-            self.console.print(Panel.fit(self.lang["missing_key"], style="red"))
+            self.console.print(Panel.fit(MESSAGES["missing_key"], style="red"))
             return
 
         prepared_message, attached_paths, attachment_errors = self._prepare_message_with_files(message)
         for error in attachment_errors:
-            self.console.print(Panel.fit(error, style="red", border_style="red", title=self.lang["error"]))
+            self.console.print(Panel.fit(error, style="red", border_style="red", title=MESSAGES["error"]))
         for path in attached_paths:
             display = self._format_display_path(path)
-            self.console.print(Panel.fit(self.lang["file_attached"].format(path=display), style="cyan"))
+            self.console.print(Panel.fit(MESSAGES["file_attached"].format(path=display), style="cyan"))
 
         if not prepared_message:
-            self.console.print(Panel.fit(self.lang["message_empty"], style="yellow"))
+            self.console.print(Panel.fit(MESSAGES["message_empty"], style="yellow"))
             return
 
         thinking_enabled = self.is_thinking_enabled()
@@ -549,7 +526,7 @@ class TerminalApp:
         system_instruction = "\n\n".join(system_instruction_parts) if system_instruction_parts else None
 
         generation_config = self._build_generation_config(thinking_enabled)
-        status_message = self.lang["thinking_in_progress"] if thinking_enabled else self.lang["sending"]
+        status_message = MESSAGES["thinking_in_progress"] if thinking_enabled else MESSAGES["sending"]
         spinner = Spinner("dots", text=status_message)
         status_panel = Panel(spinner, border_style="blue", box=box.ROUNDED)
         try:
@@ -561,7 +538,7 @@ class TerminalApp:
                     generation_config=generation_config,
                 )
         except RuntimeError as exc:
-            self.console.print(Panel.fit(self.lang["http_error"].format(detail=str(exc)), title=self.lang["error"], style="red"))
+            self.console.print(Panel.fit(MESSAGES["http_error"].format(detail=str(exc)), title=MESSAGES["error"], style="red"))
             return
 
         self.history_manager.add_entry("user", prepared_message)
@@ -619,9 +596,9 @@ class TerminalApp:
             candidate = candidate.resolve(strict=False)
 
         if not candidate.exists():
-            return self.lang["file_not_found"].format(path=str(candidate))
+            return MESSAGES["file_not_found"].format(path=str(candidate))
         if not candidate.is_file():
-            return self.lang["file_not_file"].format(path=str(candidate))
+            return MESSAGES["file_not_file"].format(path=str(candidate))
 
         try:
             text = candidate.read_text(encoding="utf-8")
@@ -629,9 +606,9 @@ class TerminalApp:
             try:
                 text = candidate.read_text(encoding="utf-8", errors="replace")
             except OSError as exc:
-                return self.lang["file_read_error"].format(path=str(candidate), error=str(exc))
+                return MESSAGES["file_read_error"].format(path=str(candidate), error=str(exc))
         except OSError as exc:
-            return self.lang["file_read_error"].format(path=str(candidate), error=str(exc))
+            return MESSAGES["file_read_error"].format(path=str(candidate), error=str(exc))
 
         return candidate, text
 
@@ -669,7 +646,7 @@ class TerminalApp:
         else:
             rendered = response
         
-        title = f"{self.lang['model_label']} ({self.settings_manager.settings.model})"
+        title = f"{MESSAGES['model_label']} ({self.settings_manager.settings.model})"
         if self.settings_manager.settings.hacking_mode:
             title += " [HACKING MODE]"
             
@@ -678,13 +655,13 @@ class TerminalApp:
 
     def copy_last_response(self) -> None:
         if not self._last_response:
-            self.console.print(Panel.fit(self.lang["copy_no_response"], style="yellow"))
+            self.console.print(Panel.fit(MESSAGES["copy_no_response"], style="yellow"))
             return
         success = ClipboardHelper.copy_text(self._last_response)
         if success:
-            self.console.print(Panel.fit(self.lang["copy_success"], style="green"))
+            self.console.print(Panel.fit(MESSAGES["copy_success"], style="green"))
         else:
-            self.console.print(Panel.fit(self.lang["copy_failure"], style="yellow"))
+            self.console.print(Panel.fit(MESSAGES["copy_failure"], style="yellow"))
 
 
 def main() -> None:

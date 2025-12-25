@@ -57,7 +57,7 @@ class ChatHistoryManager:
                     self.sessions = []
                     self.current_session_id = None
             except json.JSONDecodeError:
-                Console().print(Panel.fit("Historie konnte nicht gelesen werden – wird zurückgesetzt.", style="yellow"))
+                Console().print(Panel.fit("History could not be read – resetting.", style="yellow"))
                 self.sessions = []
                 self.current_session_id = None
         else:
