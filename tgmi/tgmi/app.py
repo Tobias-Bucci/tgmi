@@ -211,19 +211,19 @@ class TerminalApp:
 
             choice = self.console.input(MESSAGES["enter_choice"]).strip()
             if choice == "1":
-                self.update_api_key()
-            elif choice == "2":
-                self.change_output_format()
-            elif choice == "3":
                 self.change_model()
-            elif choice == "4":
+            elif choice == "2":
                 self.toggle_thinking_mode()
+            elif choice == "3":
+                self.toggle_hacking_mode()
+            elif choice == "4":
+                self.change_output_format()
             elif choice == "5":
                 self.change_max_tokens()
             elif choice == "6":
                 self.change_timeout()
             elif choice == "7":
-                self.toggle_hacking_mode()
+                self.update_api_key()
             elif choice == "8":
                 break
             else:

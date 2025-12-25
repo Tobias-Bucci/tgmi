@@ -57,13 +57,13 @@ MESSAGES = {
     "model_label": "Gemini",
     "options_title": "Settings",
     "options_menu": (
-        "1) Change API key\n"
-        "2) Change output format\n"
-        "3) Change model\n"
-        "4) Toggle thinking mode\n"
+        "1) Change model\n"
+        "2) Toggle thinking mode\n"
+        "3) Toggle hacking mode\n"
+        "4) Change output format\n"
         "5) Set token limit\n"
         "6) Set timeout\n"
-        "7) Toggle hacking mode\n"
+        "7) Change API key\n"
         "8) Back"
     ),
     "enter_choice": "Choose an option (1-8): ",
@@ -133,9 +133,20 @@ MESSAGES = {
     "http_error": "API request failed: {detail}",
     "help_title": "Shortcuts",
     "help_text": (
-        "Available shortcuts:\n"
-        ":q - Quit\n:s - Save history\n:l - Load history\n"
-        ":o - Settings\n:c - Clear history\n:n - New chat\n:x - Export history as Markdown\n:f - Search history\n:i - Conversation insights\n:h - Help\n:cp - Copy last response"
+        "[bold]General[/bold]\n"
+        "  :h   Show this help\n"
+        "  :o   Open settings\n"
+        "  :q   Quit application\n\n"
+        "[bold]Chat[/bold]\n"
+        "  :n   Start new chat session\n"
+        "  :cp  Copy last response to clipboard\n\n"
+        "[bold]History[/bold]\n"
+        "  :s   Save history to disk\n"
+        "  :l   Load history from disk\n"
+        "  :c   Clear current history\n"
+        "  :x   Export history as Markdown\n"
+        "  :f   Search in history\n"
+        "  :i   Show conversation insights"
     ),
     "file_command_hint": "Lines starting with # <path> or ! <path> attach files to the next request.",
     "file_attached": "Attached file: {path}",
