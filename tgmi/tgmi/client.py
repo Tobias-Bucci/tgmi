@@ -40,6 +40,7 @@ class GeminiClient:
         system_instruction: Optional[str] = None,
         generation_config: Optional[Dict[str, Any]] = None,
         allow_max_tokens_retry: bool = True,
+        google_search: bool = False,
     ) -> str:
         headers = {"Content-Type": "application/json"}
         contents = [*history]
@@ -53,9 +54,12 @@ class GeminiClient:
             }
         if generation_config:
             payload["generationConfig"] = copy.deepcopy(generation_config)
+        
+        if google_search:
+            payload["tools"] = [{"googleSearch": {}}]
 
         bases_to_try = [self.api_base] + [base for base in self.API_BASES if base != self.api_base]
-        if system_instruction:
+        if system_instruction or google_search:
             beta_base = self.API_BASES[-1]
             if beta_base in bases_to_try:
                 bases_to_try.remove(beta_base)
@@ -81,10 +85,11 @@ class GeminiClient:
                     continue
                 if (
                     status_code == 400
-                    and system_instruction is not None
+                    and (system_instruction is not None or google_search)
                     and (
                         "systemInstruction" in (detail or "")
                         or "system_instruction" in (detail or "")
+                        or "tools" in (detail or "")
                     )
                     and base != self.API_BASES[-1]
                 ):

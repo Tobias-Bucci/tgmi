@@ -207,6 +207,15 @@ class TerminalApp:
                 MESSAGES["current_hacking_mode"].format(state=hacking_state),
             )
 
+            if self.settings_manager.settings.google_search:
+                search_state = MESSAGES["google_search_on"]
+            else:
+                search_state = MESSAGES["google_search_off"]
+            table.add_row(
+                "-",
+                MESSAGES["current_google_search"].format(state=search_state),
+            )
+
             self.console.print(table)
 
             choice = self.console.input(MESSAGES["enter_choice"]).strip()
@@ -217,14 +226,16 @@ class TerminalApp:
             elif choice == "3":
                 self.toggle_hacking_mode()
             elif choice == "4":
-                self.change_output_format()
+                self.toggle_google_search()
             elif choice == "5":
-                self.change_max_tokens()
+                self.change_output_format()
             elif choice == "6":
-                self.change_timeout()
+                self.change_max_tokens()
             elif choice == "7":
-                self.update_api_key()
+                self.change_timeout()
             elif choice == "8":
+                self.update_api_key()
+            elif choice == "9":
                 break
             else:
                 self.console.print(Panel.fit(MESSAGES["invalid_choice"], style="yellow"))
@@ -293,6 +304,14 @@ class TerminalApp:
             self.process_user_message(HACKING_MODE_PROMPT)
         else:
             self.console.print(Panel.fit(MESSAGES["hacking_mode_disabled"], style="green"))
+
+    def toggle_google_search(self) -> None:
+        new_state = not self.settings_manager.settings.google_search
+        self.settings_manager.update(google_search=new_state)
+        if new_state:
+            self.console.print(Panel.fit(MESSAGES["google_search_enabled"], style="green"))
+        else:
+            self.console.print(Panel.fit(MESSAGES["google_search_disabled"], style="green"))
 
     def _determine_retry_limit(self) -> Optional[int]:
         max_tokens = self.settings_manager.settings.max_output_tokens
@@ -536,6 +555,7 @@ class TerminalApp:
                     prepared_message,
                     system_instruction=system_instruction,
                     generation_config=generation_config,
+                    google_search=self.settings_manager.settings.google_search,
                 )
         except RuntimeError as exc:
             self.console.print(Panel.fit(MESSAGES["http_error"].format(detail=str(exc)), title=MESSAGES["error"], style="red"))

@@ -60,13 +60,14 @@ MESSAGES = {
         "1) Change model\n"
         "2) Toggle thinking mode\n"
         "3) Toggle hacking mode\n"
-        "4) Change output format\n"
-        "5) Set token limit\n"
-        "6) Set timeout\n"
-        "7) Change API key\n"
-        "8) Back"
+        "4) Toggle Google Search\n"
+        "5) Change output format\n"
+        "6) Set token limit\n"
+        "7) Set timeout\n"
+        "8) Change API key\n"
+        "9) Back"
     ),
-    "enter_choice": "Choose an option (1-8): ",
+    "enter_choice": "Choose an option (1-9): ",
     "new_api_key": "Enter new API key: ",
     "api_updated": "API key updated.",
     "format_updated": "Output format updated.",
@@ -96,6 +97,11 @@ MESSAGES = {
     "hacking_mode_off": "disabled",
     "hacking_mode_enabled": "Hacking mode enabled – new chat started.",
     "hacking_mode_disabled": "Hacking mode disabled.",
+    "current_google_search": "Google Search: {state}",
+    "google_search_on": "enabled",
+    "google_search_off": "disabled",
+    "google_search_enabled": "Google Search enabled.",
+    "google_search_disabled": "Google Search disabled.",
     "copy_success": "Response copied to clipboard.",
     "copy_failure": "Could not copy the response to the clipboard.",
     "copy_no_response": "There is no response available to copy.",
