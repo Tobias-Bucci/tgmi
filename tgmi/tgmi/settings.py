@@ -22,6 +22,7 @@ class Settings:
     output_format: str = "markdown"
     history_path: str = str(DEFAULT_HISTORY_PATH)
     extended_thinking: bool = False
+    hacking_mode: bool = False
     max_output_tokens: int | None = None
     request_timeout: int = DEFAULT_REQUEST_TIMEOUT
 

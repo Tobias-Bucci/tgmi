@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import re
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -18,21 +19,86 @@ class ChatHistoryManager:
 
     def __init__(self, path: Path) -> None:
         self.path = path
-        self.entries: List[Dict[str, str]] = []
+        self.sessions: List[Dict[str, Any]] = []
+        self.current_session_id: Optional[str] = None
         self.load()
+
+    @property
+    def entries(self) -> List[Dict[str, str]]:
+        """Return messages of the current session."""
+        session = self._get_current_session()
+        if session:
+            return session.get("messages", [])
+        return []
+
+    def _get_current_session(self) -> Optional[Dict[str, Any]]:
+        if not self.current_session_id:
+            return None
+        for session in self.sessions:
+            if session["id"] == self.current_session_id:
+                return session
+        return None
 
     def load(self) -> None:
         if self.path.exists():
             try:
-                self.entries = json.loads(self.path.read_text(encoding="utf-8"))
+                data = json.loads(self.path.read_text(encoding="utf-8"))
+                if isinstance(data, list):
+                    # Migration from old format
+                    self._migrate_from_list(data)
+                elif isinstance(data, dict) and "sessions" in data:
+                    self.sessions = data["sessions"]
+                    self.current_session_id = data.get("current_session_id")
+                    # Ensure valid current session
+                    if not self._get_current_session() and self.sessions:
+                        self.current_session_id = self.sessions[-1]["id"]
+                else:
+                    # Unknown format or empty dict
+                    self.sessions = []
+                    self.current_session_id = None
             except json.JSONDecodeError:
                 Console().print(Panel.fit("Historie konnte nicht gelesen werden – wird zurückgesetzt.", style="yellow"))
-                self.entries = []
+                self.sessions = []
+                self.current_session_id = None
         else:
-            self.entries = []
+            self.sessions = []
+            self.current_session_id = None
+        
+        if not self.sessions:
+            self.start_new_session()
+
+    def _migrate_from_list(self, old_entries: List[Dict[str, str]]) -> None:
+        session_id = str(uuid.uuid4())
+        self.sessions = [{
+            "id": session_id,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "messages": old_entries
+        }]
+        self.current_session_id = session_id
+        self.save()
+
+    def start_new_session(self) -> None:
+        session_id = str(uuid.uuid4())
+        new_session = {
+            "id": session_id,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "messages": []
+        }
+        self.sessions.append(new_session)
+        self.current_session_id = session_id
+        self.save()
 
     def add_entry(self, role: str, content: str) -> None:
-        self.entries.append(
+        session = self._get_current_session()
+        if not session:
+            self.start_new_session()
+            session = self._get_current_session()
+        
+        # Ensure messages list exists
+        if "messages" not in session:
+            session["messages"] = []
+
+        session["messages"].append(
             {
                 "role": role,
                 "content": content,
@@ -41,11 +107,17 @@ class ChatHistoryManager:
         )
 
     def clear(self) -> None:
-        self.entries.clear()
-        self.save()
+        session = self._get_current_session()
+        if session:
+            session["messages"] = []
+            self.save()
 
     def save(self) -> None:
-        payload = json.dumps(self.entries, indent=2, ensure_ascii=False)
+        data = {
+            "sessions": self.sessions,
+            "current_session_id": self.current_session_id
+        }
+        payload = json.dumps(data, indent=2, ensure_ascii=False)
         self.path.write_text(payload, encoding="utf-8")
 
     def export_markdown(

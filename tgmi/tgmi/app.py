@@ -25,6 +25,7 @@ from .constants import (
     THINKING_GENERATION_CONFIG_BASE,
     THINKING_MODELS,
     THINKING_SYSTEM_PROMPT,
+    HACKING_MODE_PROMPT,
 )
 from .history import ChatHistoryManager
 from .settings import SettingsManager
@@ -147,6 +148,9 @@ class TerminalApp:
             if Confirm.ask(self.lang["confirm_clear"], default=False):
                 self.history_manager.clear()
                 self.console.print(Panel.fit(self.lang["history_cleared"], style="yellow"))
+        elif command == "n":
+            self.history_manager.start_new_session()
+            self.console.print(Panel.fit(self.lang["new_chat_started"], style="green"))
         elif command == "x":
             self.export_history_markdown()
         elif command == "f":
@@ -205,6 +209,16 @@ class TerminalApp:
                 "-",
                 self.lang["current_thinking"].format(state=thinking_state),
             )
+            
+            if self.settings_manager.settings.hacking_mode:
+                hacking_state = self.lang["hacking_mode_on"]
+            else:
+                hacking_state = self.lang["hacking_mode_off"]
+            table.add_row(
+                "-",
+                self.lang["current_hacking_mode"].format(state=hacking_state),
+            )
+
             self.console.print(table)
 
             choice = self.console.input(self.lang["enter_choice"]).strip()
@@ -223,6 +237,8 @@ class TerminalApp:
             elif choice == "7":
                 self.change_timeout()
             elif choice == "8":
+                self.toggle_hacking_mode()
+            elif choice == "9":
                 break
             else:
                 self.console.print(Panel.fit(self.lang["invalid_choice"], style="yellow"))
@@ -287,6 +303,19 @@ class TerminalApp:
             self.console.print(Panel.fit(self.lang["thinking_enabled"], style="green"))
         else:
             self.console.print(Panel.fit(self.lang["thinking_disabled"], style="green"))
+
+    def toggle_hacking_mode(self) -> None:
+        new_state = not self.settings_manager.settings.hacking_mode
+        self.settings_manager.update(hacking_mode=new_state)
+
+        # Always start a new session when toggling
+        self.history_manager.start_new_session()
+
+        if new_state:
+            self.console.print(Panel.fit(self.lang["hacking_mode_enabled"], style="green"))
+            self.process_user_message(HACKING_MODE_PROMPT)
+        else:
+            self.console.print(Panel.fit(self.lang["hacking_mode_disabled"], style="green"))
 
     def _determine_retry_limit(self) -> Optional[int]:
         max_tokens = self.settings_manager.settings.max_output_tokens
@@ -509,6 +538,16 @@ class TerminalApp:
             return
 
         thinking_enabled = self.is_thinking_enabled()
+        hacking_enabled = self.settings_manager.settings.hacking_mode
+
+        system_instruction_parts = []
+        if hacking_enabled:
+            system_instruction_parts.append(HACKING_MODE_PROMPT)
+        if thinking_enabled:
+            system_instruction_parts.append(THINKING_SYSTEM_PROMPT)
+        
+        system_instruction = "\n\n".join(system_instruction_parts) if system_instruction_parts else None
+
         generation_config = self._build_generation_config(thinking_enabled)
         status_message = self.lang["thinking_in_progress"] if thinking_enabled else self.lang["sending"]
         spinner = Spinner("dots", text=status_message)
@@ -518,7 +557,7 @@ class TerminalApp:
                 response = self.client.send_message(
                     self.history_manager.build_gemini_payload(),
                     prepared_message,
-                    system_instruction=THINKING_SYSTEM_PROMPT if thinking_enabled else None,
+                    system_instruction=system_instruction,
                     generation_config=generation_config,
                 )
         except RuntimeError as exc:
@@ -629,7 +668,12 @@ class TerminalApp:
             rendered = Markdown(response)
         else:
             rendered = response
-        panel = Panel(rendered, title=f"{self.lang['model_label']} ({self.settings_manager.settings.model})", border_style="magenta", box=box.ROUNDED)
+        
+        title = f"{self.lang['model_label']} ({self.settings_manager.settings.model})"
+        if self.settings_manager.settings.hacking_mode:
+            title += " [HACKING MODE]"
+            
+        panel = Panel(rendered, title=title, border_style="magenta", box=box.ROUNDED)
         self.console.print(panel)
 
     def copy_last_response(self) -> None:
@@ -649,5 +693,7 @@ def main() -> None:
         app.run()
     except KeyboardInterrupt:
         Console().print("\nProgramm beendet.")
+        if app.settings_manager.settings.hacking_mode:
+            app.settings_manager.update(hacking_mode=False)
         time.sleep(0.2)
         sys.exit(0)
