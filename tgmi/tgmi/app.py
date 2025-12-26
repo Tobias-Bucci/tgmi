@@ -258,20 +258,36 @@ class TerminalApp:
             self.console.print(Panel.fit(MESSAGES["invalid_choice"], style="yellow"))
 
     def change_model(self) -> None:
-        models_hint = ", ".join(SUGGESTED_MODELS)
-        self.console.print(Panel.fit(MESSAGES["available_models"].format(models=models_hint), style="cyan"))
-        new_model = self.console.input(MESSAGES["model_prompt"]).strip()
-        if new_model:
-            self.settings_manager.update(model=new_model)
-            self.client.update_model(new_model)
-            self.console.print(Panel.fit(MESSAGES["model_updated"], style="green"))
-            if self.settings_manager.settings.extended_thinking:
-                if new_model in THINKING_MODELS:
-                    self.console.print(Panel.fit(MESSAGES["thinking_enabled"], style="cyan"))
-                else:
-                    self.console.print(Panel.fit(MESSAGES["thinking_unavailable"], style="yellow"))
-        else:
+        table = Table(title="Available Models", box=box.SIMPLE, show_edge=False)
+        table.add_column("#", style="cyan")
+        table.add_column("Model ID", style="white")
+        
+        for idx, model in enumerate(SUGGESTED_MODELS, 1):
+            table.add_row(str(idx), model)
+        
+        self.console.print(table)
+        self.console.print(Panel.fit("Enter the number of the model, or type a custom model ID.", style="cyan"))
+        
+        user_input = self.console.input(MESSAGES["model_prompt"]).strip()
+        if not user_input:
             self.console.print(Panel.fit(MESSAGES["invalid_choice"], style="yellow"))
+            return
+
+        new_model = user_input
+        if user_input.isdigit():
+            idx = int(user_input)
+            if 1 <= idx <= len(SUGGESTED_MODELS):
+                new_model = SUGGESTED_MODELS[idx - 1]
+        
+        self.settings_manager.update(model=new_model)
+        self.client.update_model(new_model)
+        self.console.print(Panel.fit(MESSAGES["model_updated"], style="green"))
+        
+        if self.settings_manager.settings.extended_thinking:
+            if new_model in THINKING_MODELS:
+                self.console.print(Panel.fit(MESSAGES["thinking_enabled"], style="cyan"))
+            else:
+                self.console.print(Panel.fit(MESSAGES["thinking_unavailable"], style="yellow"))
 
     def is_thinking_enabled(self) -> bool:
         return (
